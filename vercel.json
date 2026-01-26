@@ -1,7 +1,4 @@
 {
-  "version": 2,
-  "buildCommand": null,
-  "outputDirectory": ".",
   "functions": {
     "api/feishu/index.js": {
       "runtime": "nodejs20.x"
