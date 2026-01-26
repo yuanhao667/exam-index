@@ -664,78 +664,122 @@
             appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
           };
 
-          // 使用 CORS 代理服务（绕过浏览器 CORS 限制）
-          const corsProxy = (url) => {
-            // 方案1：使用 allorigins（推荐，稳定）
-            return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-            // 备选方案（如果上面失败）：
-            // return `https://corsproxy.io/?${encodeURIComponent(url)}`;
-            // return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
-          };
-          
-          // 直接调用飞书 API（如果支持 CORS）
+          // 直接调用飞书 API（尝试多种方式）
           const callFeishuAPI = async (url, options) => {
-            // 先尝试直接调用（飞书 API 可能支持 CORS）
+            // 方案1：先尝试直接调用（飞书 API 可能支持 CORS）
             try {
-              const response = await fetch(url, options);
+              const response = await fetch(url, {
+                ...options,
+                mode: 'cors'
+              });
               if (response.ok) {
                 return response;
               }
             } catch (directError) {
-              console.log('直接调用失败，使用 CORS 代理...', directError);
+              console.log('直接调用失败:', directError.message);
             }
             
-            // 如果直接调用失败，使用 CORS 代理
-            const proxyUrl = corsProxy(url);
-            return await fetch(proxyUrl, options);
-          };
-
-          // 获取飞书 access_token（直接从浏览器调用）
-          const getFeishuAccessToken = async () => {
-            const url = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
-            const response = await callFeishuAPI(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                app_id: FEISHU_CONFIG.appId,
-                app_secret: FEISHU_CONFIG.appSecret
-              })
-            });
+            // 方案2：使用支持 POST 的 CORS 代理
+            const proxyServices = [
+              `https://corsproxy.io/?${encodeURIComponent(url)}`,
+              `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+            ];
             
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            if (data.code === 0) {
-              return data.tenant_access_token;
-            } else {
-              throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
-            }
-          };
-
-          // 获取表格列表（直接从浏览器调用）
-          const getFeishuTables = async (accessToken) => {
-            const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables`;
-            const response = await callFeishuAPI(url, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
+            for (const proxyUrl of proxyServices) {
+              try {
+                console.log('尝试 CORS 代理:', proxyUrl);
+                // 对于代理服务，需要特殊处理
+                if (proxyUrl.includes('allorigins.win')) {
+                  // allorigins 需要特殊处理 POST 请求
+                  const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      method: options.method || 'GET',
+                      url: url,
+                      headers: options.headers || {},
+                      body: options.body
+                    })
+                  });
+                  if (response.ok) {
+                    return response;
+                  }
+                } else {
+                  const response = await fetch(proxyUrl, options);
+                  if (response.ok) {
+                    return response;
+                  }
+                }
+              } catch (proxyError) {
+                console.log('代理服务失败:', proxyError.message);
+                continue;
               }
-            });
-            
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            const data = await response.json();
-            if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
-              return data.data.items[0].table_id; // 返回第一个表格的 table_id
-            } else {
-              throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
+            throw new Error('所有 CORS 代理服务都失败，请检查网络或使用本地代理服务器');
+          };
+
+          // 获取飞书 access_token（通过代理）
+          const getFeishuAccessToken = async () => {
+            try {
+              const response = await fetch(getProxyUrl(), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  action: 'getToken'
+                })
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              if (data.code === 0) {
+                return data.tenant_access_token;
+              } else {
+                throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
+              }
+            } catch (error) {
+              console.error('获取 access_token 错误:', error);
+              if (error.message.includes('Failed to fetch')) {
+                throw new Error('无法连接到代理服务器。请确保已运行本地代理服务器：node proxy-server.js');
+              }
+              throw error;
+            }
+          };
+
+          // 获取表格列表（通过代理）
+          const getFeishuTables = async (accessToken) => {
+            try {
+              const response = await fetch(getProxyUrl(), {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  action: 'getTables',
+                  accessToken: accessToken
+                })
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
+                return data.data.items[0].table_id; // 返回第一个表格的 table_id
+              } else {
+                throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
+              }
+            } catch (error) {
+              console.error('获取表格列表错误:', error);
+              throw error;
             }
           };
 
@@ -791,15 +835,18 @@
                 }
               };
 
-              // 5. 写入数据到飞书表格（直接从浏览器调用）
-              const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`;
-              const response = await callFeishuAPI(url, {
+              // 5. 写入数据到飞书表格（通过代理）
+              const response = await fetch(getProxyUrl(), {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`,
                   'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(recordData)
+                body: JSON.stringify({
+                  action: 'saveRecord',
+                  accessToken: accessToken,
+                  tableId: tableId,
+                  recordData: recordData
+                })
               });
 
               if (!response.ok) {
