@@ -657,110 +657,31 @@
             return { score, maxScore: totalMaxScore, dimensionScores, dimensionMaxScores };
           };
 
-          // 飞书 API 配置（直接从浏览器调用，绕过 Vercel）
+          // 飞书 API 配置（通过本地代理服务器或 Vercel Functions）
           const FEISHU_CONFIG = {
-            appId: 'cli_a9f9f58238381bde',
-            appSecret: '4d9U9oZgDtoL7PgSHZltgdx13NP8WDVE',
             appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
           };
 
-          // 检测是否在本地环境（使用本地代理服务器）
-          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          
-          // 获取代理URL（本地使用本地代理，生产环境直接调用）
+          // 获取代理API地址（自动检测环境）
           const getProxyUrl = () => {
-            if (isLocal) {
+            // 检测是否在本地开发环境（localhost）
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
               return 'http://localhost:3000/api/feishu';
             }
-            return null; // 生产环境直接调用，不使用代理
+            // 生产环境使用相对路径（Vercel Functions）
+            return '/api/feishu';
           };
 
-          // 直接调用飞书 API（本地通过代理，生产环境直接调用）
-          const callFeishuAPI = async (url, options = {}) => {
-            // 如果是本地环境，使用本地代理服务器
-            if (isLocal) {
-              const proxyUrl = getProxyUrl();
-              console.log('🌐 本地环境：通过本地代理服务器调用');
-              
-              // 根据 URL 判断 action
-              let action = 'saveRecord';
-              if (url.includes('/auth/v3/tenant_access_token')) {
-                action = 'getToken';
-              } else if (url.includes('/tables') && !url.includes('/records') && !url.includes('/fields')) {
-                action = 'getTables';
-              } else if (url.includes('/fields')) {
-                action = 'getFields';
-              }
-              
-              // 构建代理请求体
-              let proxyBody = {
-                action: action
-              };
-              
-              if (action === 'getToken') {
-                // 不需要额外参数
-              } else if (action === 'getTables') {
-                proxyBody.accessToken = options.headers?.['Authorization']?.replace('Bearer ', '');
-              } else if (action === 'getFields') {
-                const tableIdMatch = url.match(/\/tables\/([^\/]+)\/fields/);
-                proxyBody.accessToken = options.headers?.['Authorization']?.replace('Bearer ', '');
-                proxyBody.tableId = tableIdMatch ? tableIdMatch[1] : null;
-              } else if (action === 'saveRecord') {
-                const tableIdMatch = url.match(/\/tables\/([^\/]+)\/records/);
-                proxyBody.accessToken = options.headers?.['Authorization']?.replace('Bearer ', '');
-                proxyBody.tableId = tableIdMatch ? tableIdMatch[1] : null;
-                proxyBody.recordData = JSON.parse(options.body);
-              }
-              
-              const response = await fetch(proxyUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(proxyBody)
-              });
-              
-              return response;
-            }
-            
-            // 生产环境：直接调用飞书 API
-            try {
-              console.log('🌐 生产环境：尝试直接调用飞书 API:', url);
-              const directResponse = await fetch(url, {
-                method: options.method || 'GET',
-                headers: {
-                  ...options.headers,
-                  'Content-Type': 'application/json'
-                },
-                body: options.body
-              });
-              
-              // 如果直接调用成功，返回结果
-              if (directResponse.ok) {
-                console.log('✅ 直接调用成功');
-                return directResponse;
-              }
-              
-              // 如果直接调用失败，抛出错误
-              console.error('❌ 直接调用失败（状态码:', directResponse.status, '）');
-              const errorText = await directResponse.text();
-              throw new Error(`HTTP error! status: ${directResponse.status}, body: ${errorText}`);
-            } catch (error) {
-              console.error('❌ 直接调用出错:', error.message);
-              throw error;
-            }
-          };
-
-          // 获取飞书 access_token（直接从浏览器调用）
+          // 获取飞书 access_token（通过代理）
           const getFeishuAccessToken = async () => {
             try {
-              console.log('🔑 直接从浏览器获取 access_token...');
-              const url = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
-              const response = await callFeishuAPI(url, {
+              const response = await fetch(getProxyUrl(), {
                 method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
                 body: JSON.stringify({
-                  app_id: FEISHU_CONFIG.appId,
-                  app_secret: FEISHU_CONFIG.appSecret
+                  action: 'getToken'
                 })
               });
               
@@ -770,27 +691,31 @@
               
               const data = await response.json();
               if (data.code === 0) {
-                console.log('✅ access_token 获取成功');
                 return data.tenant_access_token;
               } else {
                 throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
               }
             } catch (error) {
-              console.error('❌ 获取 access_token 错误:', error);
+              console.error('获取 access_token 错误:', error);
+              if (error.message.includes('Failed to fetch')) {
+                throw new Error('无法连接到代理服务器。请确保已运行本地代理服务器：node proxy-server.js');
+              }
               throw error;
             }
           };
 
-          // 获取表格列表（直接从浏览器调用）
+          // 获取表格列表（通过代理）
           const getFeishuTables = async (accessToken) => {
             try {
-              console.log('📋 直接从浏览器获取表格列表...');
-              const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables`;
-              const response = await callFeishuAPI(url, {
-                method: 'GET',
+              const response = await fetch(getProxyUrl(), {
+                method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`
-                }
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  action: 'getTables',
+                  accessToken: accessToken
+                })
               });
               
               if (!response.ok) {
@@ -799,13 +724,12 @@
               
               const data = await response.json();
               if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
-                console.log('✅ 表格 ID 获取成功:', data.data.items[0].table_id);
                 return data.data.items[0].table_id; // 返回第一个表格的 table_id
               } else {
                 throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
               }
             } catch (error) {
-              console.error('❌ 获取表格列表错误:', error);
+              console.error('获取表格列表错误:', error);
               throw error;
             }
           };
@@ -871,61 +795,19 @@
               console.log('📝 步骤3: 准备保存的数据:', JSON.stringify(recordData, null, 2));
               console.log('📝 步骤3: 使用的字段名:', Object.keys(recordData.fields));
               
-              // 3.5. 获取表格字段定义（用于诊断字段名问题）
-              let actualFieldNames = [];
-              try {
-                console.log('📝 步骤3.5: 获取表格字段定义（用于诊断）...');
-                const fieldsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/fields`;
-                const fieldsResponse = await callFeishuAPI(fieldsUrl, {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`
-                  }
-                });
-                const fieldsData = await fieldsResponse.json();
-                if (fieldsData.code === 0 && fieldsData.data && fieldsData.data.items) {
-                  console.log('📋 ========== 飞书表格实际字段名列表 ==========');
-                  actualFieldNames = fieldsData.data.items.map(f => f.field_name);
-                  actualFieldNames.forEach((name, index) => {
-                    console.log(`  ${index + 1}. "${name}" (类型: ${fieldsData.data.items[index].type})`);
-                  });
-                  console.log('📋 ========== 代码使用的字段名 ==========');
-                  Object.keys(recordData.fields).forEach((name, index) => {
-                    console.log(`  ${index + 1}. "${name}"`);
-                  });
-                  
-                  // 检查字段名是否匹配
-                  const codeFieldNames = Object.keys(recordData.fields);
-                  const missingFields = codeFieldNames.filter(f => !actualFieldNames.includes(f));
-                  const extraFields = actualFieldNames.filter(f => !codeFieldNames.includes(f));
-                  
-                  if (missingFields.length > 0) {
-                    console.error('❌ ========== 字段名不匹配！==========');
-                    console.error('❌ 以下字段在飞书表格中不存在:', missingFields);
-                    console.error('💡 请检查字段名是否完全一致（包括空格、特殊字符、大小写）');
-                  }
-                  if (extraFields.length > 0) {
-                    console.warn('⚠️ 飞书表格中还有以下字段未使用:', extraFields);
-                  }
-                  if (missingFields.length === 0 && extraFields.length === 0) {
-                    console.log('✅ 字段名检查通过：所有字段名完全匹配');
-                  }
-                } else {
-                  console.warn('⚠️ 无法获取字段定义:', fieldsData);
-                }
-              } catch (fieldsError) {
-                console.warn('⚠️ 获取字段定义失败（不影响保存）:', fieldsError);
-              }
-
-              // 5. 写入数据到飞书表格（直接从浏览器调用）
-              console.log('📝 步骤4: 直接从浏览器发送保存请求...');
-              const saveUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`;
-              const response = await callFeishuAPI(saveUrl, {
+              // 5. 写入数据到飞书表格（通过代理）
+              console.log('📝 步骤4: 发送保存请求...');
+              const response = await fetch(getProxyUrl(), {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`
+                  'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(recordData)
+                body: JSON.stringify({
+                  action: 'saveRecord',
+                  accessToken: accessToken,
+                  tableId: tableId,
+                  recordData: recordData
+                })
               });
 
               console.log('📡 响应状态:', response.status, response.statusText);
