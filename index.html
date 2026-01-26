@@ -738,12 +738,18 @@
           const saveToFeishu = async (score) => {
             try {
               showToast('正在保存数据到飞书...', 'info');
+              console.log('🚀 开始保存到飞书...');
+              console.log('📍 代理地址:', getProxyUrl());
               
               // 1. 获取 access_token
+              console.log('📝 步骤1: 获取 access_token...');
               const accessToken = await getFeishuAccessToken();
+              console.log('✅ access_token 获取成功');
               
               // 2. 获取表格 ID
+              console.log('📝 步骤2: 获取表格 ID...');
               const tableId = await getFeishuTables(accessToken);
+              console.log('✅ 表格 ID:', tableId);
               
               // 3. 准备数据
               const total = quizQuestions.length || 1;
@@ -785,8 +791,11 @@
                   '答题详情': JSON.stringify(answerDetails, null, 2)
                 }
               };
+              
+              console.log('📝 步骤3: 准备保存的数据:', JSON.stringify(recordData, null, 2));
 
               // 5. 写入数据到飞书表格（通过代理）
+              console.log('📝 步骤4: 发送保存请求...');
               const response = await fetch(getProxyUrl(), {
                 method: 'POST',
                 headers: {
@@ -800,26 +809,34 @@
                 })
               });
 
+              console.log('📡 响应状态:', response.status, response.statusText);
+              
               if (!response.ok) {
                 const errorText = await response.text();
-                console.error('HTTP错误响应:', errorText);
-                throw new Error(`HTTP error! status: ${response.status}`);
+                console.error('❌ HTTP错误响应:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
               }
 
               const result = await response.json();
+              console.log('📦 飞书API响应:', result);
               
               if (result.code === 0) {
+                console.log('✅ 保存成功！');
                 showToast(`数据已成功保存到飞书！得分：${score}`, 'success');
                 return true;
               } else {
+                console.error('❌ 飞书API返回错误:', result);
                 throw new Error(result.msg || `保存数据失败: code=${result.code}`);
               }
             } catch (error) {
-              console.error('保存到飞书错误:', error);
+              console.error('❌ 保存到飞书错误:', error);
+              console.error('错误堆栈:', error.stack);
               // 提供更详细的错误信息
               let errorMessage = error.message;
-              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('CORS')) {
-                errorMessage = '网络连接失败或跨域问题，请联系管理员检查配置';
+              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorMessage = `无法连接到代理服务器。请确保已运行: node proxy-server.js\n错误: ${error.message}`;
+              } else if (error.message.includes('CORS')) {
+                errorMessage = '跨域问题，请检查代理服务器配置';
               } else if (error.message.includes('HTTP error')) {
                 errorMessage = `服务器错误: ${error.message}`;
               }

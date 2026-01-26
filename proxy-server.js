@@ -40,6 +40,7 @@ const server = http.createServer((req, res) => {
         };
 
         if (action === 'getToken') {
+          console.log('🔑 获取 access_token...');
           const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
             method: 'POST',
             headers: {
@@ -51,12 +52,14 @@ const server = http.createServer((req, res) => {
             })
           });
           const data = await response.json();
+          console.log('📡 飞书token响应:', data.code === 0 ? '成功' : data.msg);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
           return;
         }
 
         if (action === 'getTables') {
+          console.log('📊 获取表格列表...');
           const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables`, {
             method: 'GET',
             headers: {
@@ -65,12 +68,17 @@ const server = http.createServer((req, res) => {
             }
           });
           const data = await response.json();
+          console.log('📡 表格列表响应:', data.code === 0 ? `找到 ${data.data?.items?.length || 0} 个表格` : data.msg);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
           return;
         }
 
         if (action === 'saveRecord') {
+          console.log('💾 保存记录到飞书...');
+          console.log('📋 表格ID:', tableId);
+          console.log('📝 记录数据:', JSON.stringify(recordData, null, 2));
+          
           const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`, {
             method: 'POST',
             headers: {
@@ -79,7 +87,10 @@ const server = http.createServer((req, res) => {
             },
             body: JSON.stringify(recordData)
           });
+          
           const data = await response.json();
+          console.log('📡 飞书API响应:', JSON.stringify(data, null, 2));
+          
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
           return;
