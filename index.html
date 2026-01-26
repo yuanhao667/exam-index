@@ -842,6 +842,7 @@
               console.log('📝 步骤3: 使用的字段名:', Object.keys(recordData.fields));
               
               // 3.5. 获取表格字段定义（用于诊断字段名问题）
+              let actualFieldNames = [];
               try {
                 console.log('📝 步骤3.5: 获取表格字段定义（用于诊断）...');
                 const fieldsUrl = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/fields`;
@@ -853,21 +854,34 @@
                 });
                 const fieldsData = await fieldsResponse.json();
                 if (fieldsData.code === 0 && fieldsData.data && fieldsData.data.items) {
-                  console.log('📋 飞书表格实际字段名列表:');
-                  const actualFieldNames = fieldsData.data.items.map(f => f.field_name);
-                  actualFieldNames.forEach(name => {
-                    console.log(`  - "${name}"`);
+                  console.log('📋 ========== 飞书表格实际字段名列表 ==========');
+                  actualFieldNames = fieldsData.data.items.map(f => f.field_name);
+                  actualFieldNames.forEach((name, index) => {
+                    console.log(`  ${index + 1}. "${name}" (类型: ${fieldsData.data.items[index].type})`);
                   });
-                  console.log('📋 代码使用的字段名:', Object.keys(recordData.fields));
+                  console.log('📋 ========== 代码使用的字段名 ==========');
+                  Object.keys(recordData.fields).forEach((name, index) => {
+                    console.log(`  ${index + 1}. "${name}"`);
+                  });
+                  
                   // 检查字段名是否匹配
                   const codeFieldNames = Object.keys(recordData.fields);
                   const missingFields = codeFieldNames.filter(f => !actualFieldNames.includes(f));
+                  const extraFields = actualFieldNames.filter(f => !codeFieldNames.includes(f));
+                  
                   if (missingFields.length > 0) {
-                    console.error('❌ 字段名不匹配！以下字段在飞书表格中不存在:', missingFields);
+                    console.error('❌ ========== 字段名不匹配！==========');
+                    console.error('❌ 以下字段在飞书表格中不存在:', missingFields);
                     console.error('💡 请检查字段名是否完全一致（包括空格、特殊字符、大小写）');
-                  } else {
-                    console.log('✅ 字段名检查通过');
                   }
+                  if (extraFields.length > 0) {
+                    console.warn('⚠️ 飞书表格中还有以下字段未使用:', extraFields);
+                  }
+                  if (missingFields.length === 0 && extraFields.length === 0) {
+                    console.log('✅ 字段名检查通过：所有字段名完全匹配');
+                  }
+                } else {
+                  console.warn('⚠️ 无法获取字段定义:', fieldsData);
                 }
               } catch (fieldsError) {
                 console.warn('⚠️ 获取字段定义失败（不影响保存）:', fieldsError);
@@ -912,11 +926,20 @@
                 if (result.data) {
                   console.error('❌ 错误数据:', result.data);
                 }
+                // 输出当前发送的字段名和值
+                console.error('❌ 当前发送的字段名:', Object.keys(recordData.fields));
+                console.error('❌ 当前发送的完整数据:', JSON.stringify(recordData, null, 2));
+                
                 // 如果是字段名错误，尝试提取具体字段名
                 let errorMsg = result.msg || `保存数据失败: code=${result.code}`;
                 if (result.msg && result.msg.includes('FieldNameNotFound')) {
-                  errorMsg = `字段名不匹配: ${result.msg}。请检查字段名是否与飞书表格完全一致。`;
-                  console.error('❌ 当前发送的字段名:', Object.keys(recordData.fields));
+                  // 尝试从错误信息中提取字段名
+                  const fieldMatch = result.msg.match(/FieldNameNotFound[:\s]+([^\s,]+)/i);
+                  if (fieldMatch) {
+                    errorMsg = `字段名不匹配: 字段 "${fieldMatch[1]}" 在飞书表格中不存在。当前发送的字段名: ${Object.keys(recordData.fields).join(', ')}`;
+                  } else {
+                    errorMsg = `字段名不匹配: ${result.msg}。当前发送的字段名: ${Object.keys(recordData.fields).join(', ')}。请检查控制台中的"飞书表格实际字段名列表"进行对比。`;
+                  }
                 }
                 throw new Error(errorMsg);
               }
