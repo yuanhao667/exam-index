@@ -781,9 +781,9 @@
               // 4. 构建记录数据（根据飞书表格的实际字段名称）
               // 注意：字段名称必须与飞书表格中的列名完全一致
               // 日期字段必须使用 Unix 时间戳（毫秒）
+              // 使用完整时间戳（包含时分秒），这样排序时新数据会出现在最前面
               const now = new Date();
-              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-              const timestamp = today.getTime(); // Unix 时间戳（毫秒）
+              const timestamp = now.getTime(); // Unix 时间戳（毫秒，包含时分秒）
               
               const recordData = {
                 fields: {
@@ -791,7 +791,7 @@
                   '组别': user.role === 'ui' ? 'UI' : '视觉',
                   '得分': score,
                   '耗时': durationText,
-                  '作答日期': timestamp  // 飞书要求日期字段必须是 Unix 时间戳（毫秒）
+                  '作答日期': timestamp  // 使用完整时间戳（包含时分秒），便于按时间倒序排列
                 }
               };
               
