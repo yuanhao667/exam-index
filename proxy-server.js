@@ -31,7 +31,8 @@ const server = http.createServer((req, res) => {
 
     req.on('end', async () => {
       try {
-        const { action, accessToken, tableId, recordData } = JSON.parse(body || '{}');
+        const parsedBody = JSON.parse(body || '{}');
+        const { action, accessToken, tableId, recordData } = parsedBody;
         
         const FEISHU_CONFIG = {
           appId: 'cli_a9f9f58238381bde',
@@ -69,6 +70,23 @@ const server = http.createServer((req, res) => {
           });
           const data = await response.json();
           console.log('📡 表格列表响应:', data.code === 0 ? `找到 ${data.data?.items?.length || 0} 个表格` : data.msg);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
+          return;
+        }
+
+        if (action === 'getFields') {
+          console.log('📋 获取表格字段定义...');
+          const { tableId: fieldsTableId } = JSON.parse(body || '{}');
+          const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${fieldsTableId}/fields`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          const data = await response.json();
+          console.log('📡 字段定义响应:', data.code === 0 ? `找到 ${data.data?.items?.length || 0} 个字段` : data.msg);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(data));
           return;
