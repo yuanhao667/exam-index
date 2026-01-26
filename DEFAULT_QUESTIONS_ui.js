@@ -1,4 +1,4 @@
-const DEFAULT_QUESTIONS = [
+window.DEFAULT_QUESTIONS_UI = [
   {
     "role": "ui",
     "dimension": "维度四：会几个AI工具",
