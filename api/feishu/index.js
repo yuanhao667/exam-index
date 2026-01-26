@@ -19,11 +19,25 @@ module.exports = async (req, res) => {
   const { action, ...params } = req.body;
 
   try {
+    // 从环境变量读取飞书配置
     const FEISHU_CONFIG = {
-      appId: 'cli_a9f9f58238381bde',
-      appSecret: '4d9U9oZgDtoL7PgSHZltgdx13NP8WDVE',
-      appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
+      appId: process.env.FEISHU_APP_ID,
+      appSecret: process.env.FEISHU_APP_SECRET,
+      appToken: process.env.FEISHU_APP_TOKEN
     };
+
+    // 验证必需的配置项
+    if (!FEISHU_CONFIG.appId || !FEISHU_CONFIG.appSecret || !FEISHU_CONFIG.appToken) {
+      console.error('❌ 飞书配置缺失:', {
+        hasAppId: !!FEISHU_CONFIG.appId,
+        hasAppSecret: !!FEISHU_CONFIG.appSecret,
+        hasAppToken: !!FEISHU_CONFIG.appToken
+      });
+      return res.status(500).json({ 
+        error: '飞书配置未设置，请在管理员页面配置环境变量',
+        code: 'CONFIG_MISSING'
+      });
+    }
 
     if (action === 'getToken') {
       // 获取access_token
