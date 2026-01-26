@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>洋葱学园 UED AI 技能考核系统 v7.6</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 外部题目文件（如果文件不存在会自动忽略，使用默认题目） -->
+    <script src="DEFAULT_QUESTIONS_ui.js" onerror="console.log('DEFAULT_QUESTIONS_ui.js 未找到，将使用默认题目')"></script>
+    <script src="DEFAULT_QUESTIONS_visual.js" onerror="console.log('DEFAULT_QUESTIONS_visual.js 未找到，将使用默认题目')"></script>
+    <script>
+      // 兼容旧格式：如果外部文件使用 const DEFAULT_QUESTIONS，自动转换
+      // 初始化变量
+      if (typeof window.DEFAULT_QUESTIONS_UI === 'undefined') {
+        window.DEFAULT_QUESTIONS_UI = [];
+      }
+      if (typeof window.DEFAULT_QUESTIONS_VISUAL === 'undefined') {
+        window.DEFAULT_QUESTIONS_VISUAL = [];
+      }
+      
+      // 如果加载了旧格式的 DEFAULT_QUESTIONS（可能是 const 或 var 声明），按role分类
+      // 检查全局作用域中的 DEFAULT_QUESTIONS（非严格模式下，const 也会在全局作用域）
+      try {
+        if (typeof DEFAULT_QUESTIONS !== 'undefined' && Array.isArray(DEFAULT_QUESTIONS)) {
+          DEFAULT_QUESTIONS.forEach(q => {
+            if (q.role === 'ui') {
+              window.DEFAULT_QUESTIONS_UI.push(q);
+            } else if (q.role === 'visual') {
+              window.DEFAULT_QUESTIONS_VISUAL.push(q);
+            }
+          });
+        }
+      } catch (e) {
+        // 如果 DEFAULT_QUESTIONS 不存在或无法访问，忽略
+      }
+    </script>
+    
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(0); }
+        }
+        .animate-bounce { animation: bounce 1s infinite; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 优化滚动条样式 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: #e5e5e5; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background-color: #d4d4d4; }
+    </style>
+</head>
+<body class="bg-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- 图标组件 ---
+        const Icon = ({ path, className, size = 24, color = "currentColor" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            ChevronLeft: (props) => <Icon {...props} path={<><path d="m15 18-6-6 6-6"/></>} />,
+            Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>} />,
+            Eye: (props) => <Icon {...props} path={<><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>} />,
+            Image: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>} />,
+            Monitor: (props) => <Icon {...props} path={<><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></>} />,
+            Download: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>} />,
+            Settings: (props) => <Icon {...props} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />,
+            FileText: (props) => <Icon {...props} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></>} />,
+            RefreshCw: (props) => <Icon {...props} path={<><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></>} />,
+            Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+            CheckCircle: (props) => <Icon {...props} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />,
+            Trash2: (props) => <Icon {...props} path={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>} />,
+            Trophy: (props) => <Icon {...props} path={<><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></>} />,
+            AlertCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>} />,
+            XCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></>} />,
+            Database: (props) => <Icon {...props} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>} />
+        };
+
+        // --- 应用逻辑 ---
+
+        const LOGO_URL = "https://img.icons8.com/color/480/onion.png";
+        const ADMIN_NAMES = ["赵雷"]; 
+        const STORAGE_KEY = "onion_assessment_questions_v3";
+
+        // 从外部文件加载题目，如果文件不存在则使用默认值
+        const getDefaultQuestions = () => {
+          // 尝试从外部文件加载（支持新格式 window.DEFAULT_QUESTIONS_UI 和旧格式 DEFAULT_QUESTIONS）
+          let uiQuestions = [];
+          let visualQuestions = [];
+          
+          // 新格式：window.DEFAULT_QUESTIONS_UI / window.DEFAULT_QUESTIONS_VISUAL
+          if (typeof window.DEFAULT_QUESTIONS_UI !== 'undefined') {
+            uiQuestions = window.DEFAULT_QUESTIONS_UI;
+          }
+          if (typeof window.DEFAULT_QUESTIONS_VISUAL !== 'undefined') {
+            visualQuestions = window.DEFAULT_QUESTIONS_VISUAL;
+          }
+          
+          // 旧格式兼容：如果存在全局 DEFAULT_QUESTIONS，按role分类
+          if (typeof window.DEFAULT_QUESTIONS !== 'undefined' && Array.isArray(window.DEFAULT_QUESTIONS)) {
+            const allQuestions = window.DEFAULT_QUESTIONS;
+            uiQuestions = allQuestions.filter(q => q.role === 'ui');
+            visualQuestions = allQuestions.filter(q => q.role === 'visual');
+          }
+          
+          // 如果都没有，使用内置默认值
+          if (uiQuestions.length === 0 && visualQuestions.length === 0) {
+            return {
+              ui: [{
+                id: 'demo-ui-1', role: 'ui', dimension: '维度 1：习惯用 AI 解决问题的程度',
+                question: '【示例】这是默认题目。请管理员登录配置。',
+                options: [
+                  { id: 'A', text: '选项 A' }, { id: 'B', text: '选项 B' },
+                  { id: 'C', text: '选项 C' }, { id: 'D', text: '选项 D' }
+                ], correct: ['C', 'D'], explanation: 'A 过于严谨；B 低效；C/D 高效。', type: 'multiple'
+              }],
+              visual: [{
+                id: 'demo-visual-1', role: 'visual', dimension: '维度 1：习惯用 AI 解决问题的程度',
+                question: '【示例】这是默认题目。请管理员登录配置。',
+                options: [
+                  { id: 'A', text: '选项 A' }, { id: 'B', text: '选项 B' },
+                  { id: 'C', text: '选项 C' }, { id: 'D', text: '选项 D' }
+                ], correct: ['C', 'D'], explanation: 'A 过于严谨；B 低效；C/D 高效。', type: 'multiple'
+              }]
+            };
+          }
+          
+          return {
+            ui: uiQuestions,
+            visual: visualQuestions
+          };
+        };
+        
+        // 延迟获取，等待外部文件加载
+        const getExternalQuestions = () => {
+          return getDefaultQuestions();
+        };
+
+        const Toast = ({ message, type, onClose }) => {
+          useEffect(() => {
+            const timer = setTimeout(onClose, 3000);
+            return () => clearTimeout(timer);
+          }, [onClose]);
+
+          const bgColors = {
+            success: 'bg-[#58cc02]',
+            error: 'bg-[#ff4b4b]',
+            info: 'bg-[#1cb0f6]'
+          };
+
+          return (
+            <div className="fixed top-4 left-0 right-0 flex justify-center z-50 pointer-events-none">
+              <div className={`pointer-events-auto px-6 py-3 rounded-2xl shadow-lg text-white font-bold flex items-center gap-2 animate-bounce ${bgColors[type] || bgColors.info}`}>
+                {type === 'success' && <Icons.CheckCircle size={20} />}
+                {type === 'error' && <Icons.XCircle size={20} />}
+                {type === 'info' && <Icons.AlertCircle size={20} />}
+                {message}
+              </div>
+            </div>
+          );
+        };
+
+        const ClearModal = ({ show, onClose, onClearAll, onClearProblematic, parsedPreview }) => {
+          if (!show) return null;
+          
+          const problematicCount = parsedPreview.filter(q => q.options.length === 0).length;
+          
+          return (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-black text-[#4b4b4b]">选择清空方式</h3>
+                  <button onClick={onClose} className="text-[#afafaf] hover:text-[#ff4b4b] font-bold">
+                    <Icons.XCircle size={24} />
+                  </button>
+                </div>
+                <p className="text-sm text-[#afafaf]">请选择要清空的内容：</p>
+                <div className="space-y-3">
+                  <button
+                    onClick={onClearAll}
+                    className="w-full p-4 bg-[#ff4b4b] hover:bg-[#d40e0e] text-white rounded-xl font-bold border-b-4 border-[#d40e0e] active:border-b-0 active:translate-y-1 transition-all duration-100 flex items-center justify-center gap-2"
+                  >
+                    <Icons.Trash2 size={20} />
+                    清空输入和预览
+                  </button>
+                  <button
+                    onClick={onClearProblematic}
+                    disabled={problematicCount === 0}
+                    className={`w-full p-4 rounded-xl font-bold border-b-4 active:border-b-0 active:translate-y-1 transition-all duration-100 flex items-center justify-center gap-2 ${
+                      problematicCount === 0
+                        ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed'
+                        : 'bg-[#ff9600] hover:bg-[#e68500] text-white border-[#e68500]'
+                    }`}
+                  >
+                    <Icons.AlertCircle size={20} />
+                    清空发生识别问题的习题 {problematicCount > 0 && `(${problematicCount} 题)`}
+                  </button>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="w-full p-3 bg-white hover:bg-gray-50 text-[#4b4b4b] rounded-xl font-bold border-2 border-[#e5e5e5] border-b-4 active:border-b-0 active:translate-y-1 transition-all duration-100"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          );
+        };
+
+        // --- 强力解析引擎 V7.2 (Robust) ---
+        const parseQuestionsFromText = (text, role, questionType = 'multiple') => {
+          const questions = [];
+          if (!text) return [];
+
+          let rawText = text
+            .replace(/\u00A0/g, ' ') 
+            .replace(/[\u200B-\u200D\uFEFF]/g, '')
+            .replace(/([^\w])([A-D])[\.、\)\s]\s+/g, '$1\n$2. ')
+            .replace(/\n\s*\n/g, '\n');
+
+          rawText = rawText
+            .replace(/(?:正确)?(?:答案|Answer)\s*[:：](.*?)((?:题目)?(?:解析|Explanation|解释)|$)/gim, '\nTarget_Answer: $1\n$2')
+            .replace(/(?:题目)?(?:解析|Explanation|解释)\s*[:：]/gim, '\nTarget_Explanation: ');
+
+          const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+          
+          let currentQ = null;
+          let currentDim = '通用维度'; 
+          let state = 'idle'; 
+          
+          const saveCurrent = () => {
+            if (currentQ && currentQ.question) {
+              if (!currentQ.correct || currentQ.correct.length === 0) currentQ.correct = [];
+              if (!currentQ.explanation) currentQ.explanation = "暂无详细解析";
+              
+              if (currentQ.options.length === 0) {
+                const embeddedOptions = currentQ.question.match(/([A-D])\.\s+([^A-D]+)/g);
+                if (embeddedOptions) {
+                   embeddedOptions.forEach(opt => {
+                     const [_, id, txt] = opt.match(/([A-D])\.\s+(.*)/);
+                     currentQ.options.push({ id, text: txt.trim() });
+                   });
+                }
+              }
+
+              currentQ.id = `${role}-${questionType}-${Date.now()}-${Math.floor(Math.random() * 100000)}-${questions.length}`;
+              questions.push(currentQ);
+            }
+          };
+
+          lines.forEach((line) => {
+            let cleanLine = line.trim();
+            if (!cleanLine) return;
+
+            if (/^【.*维度/.test(cleanLine) || cleanLine.includes('维度：')) {
+               currentDim = cleanLine.replace(/[#【】\[\]]/g, '').trim();
+               return;
+            }
+
+            const qMatch = cleanLine.match(/^(\d+)[\.、\s]\s*(.*)/) || cleanLine.startsWith('[场景]') || (state === 'idle' && !cleanLine.match(/^[A-D][\.、\)]/i) && !cleanLine.startsWith('Target_') && cleanLine.length > 5);
+            
+            if (qMatch) {
+              saveCurrent();
+              let qText = '';
+              if (Array.isArray(qMatch)) {
+                  qText = qMatch[2] || cleanLine;
+              } else {
+                  qText = cleanLine;
+              }
+              
+              currentQ = {
+                role: role,
+                dimension: currentDim,
+                question: qText,
+                options: [], correct: [], explanation: '',
+                type: questionType
+              };
+              state = 'question';
+              return;
+            }
+
+            if (!currentQ) return;
+
+            if (cleanLine.startsWith('Target_Answer:')) {
+              const ansStr = cleanLine.replace('Target_Answer:', '');
+              const answers = ansStr.toUpperCase().match(/[A-D]/g);
+              if (answers) currentQ.correct = [...new Set(answers)].sort();
+              state = 'idle';
+              return;
+            }
+
+            if (cleanLine.startsWith('Target_Explanation:')) {
+              const expStr = cleanLine.replace('Target_Explanation:', '').trim();
+              currentQ.explanation = expStr;
+              state = 'explanation';
+              return;
+            }
+
+            if (state !== 'explanation') {
+              const optMatch = cleanLine.match(/^([A-D])[\.、\)]\s*(.*)/i);
+              if (optMatch) {
+                currentQ.options.push({
+                  id: optMatch[1].toUpperCase(),
+                  text: optMatch[2]
+                });
+                state = 'option';
+                return;
+              }
+            }
+
+            if (state === 'question') currentQ.question += '\n' + cleanLine;
+            else if (state === 'explanation') currentQ.explanation += '\n' + cleanLine;
+            else if (state === 'option' && currentQ.options.length > 0) {
+              currentQ.options[currentQ.options.length - 1].text += ' ' + cleanLine;
+            }
+          });
+
+          saveCurrent();
+          return questions;
+        };
+
+        const DuoButton = ({ children, onClick, variant = 'primary', className = '', disabled = false, fullWidth = false }) => {
+          const variants = {
+            primary: 'bg-[#FFD633] hover:bg-[#e6c12e] text-[#393548] border-b-4 border-[#e6c12e] active:border-b-0 active:translate-y-1',
+            secondary: 'bg-white hover:bg-gray-50 text-[#393548] border-2 border-[#e5e5e5] border-b-4 active:border-b-0 active:translate-y-1',
+            danger: 'bg-[#ff4b4b] hover:bg-[#d40e0e] text-white border-b-4 border-[#d40e0e] active:border-b-0 active:translate-y-1',
+          };
+          return (
+            <button
+              onClick={disabled ? undefined : onClick}
+              disabled={disabled}
+              className={`
+                font-bold py-3 px-6 rounded-2xl transition-all duration-100 uppercase tracking-widest text-sm sm:text-base flex justify-center items-center gap-2
+                ${variants[variant]} ${fullWidth ? 'w-full' : ''}
+                ${disabled ? 'opacity-50 cursor-not-allowed transform-none active:border-b-4' : ''}
+                ${className}
+              `}
+            >
+              {children}
+            </button>
+          );
+        };
+
+        const OptionCard = ({ option, selected, onClick }) => (
+          <div onClick={onClick} className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 select-none flex items-center gap-4 ${selected ? 'bg-[#ddf4ff] border-[#84d8ff] text-[#1899d6]' : 'bg-white border-[#e5e5e5] hover:bg-[#f7f7f7] text-[#4b4b4b] border-b-4 active:border-b-2 active:translate-y-[2px]'}`}>
+            <div className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center font-bold mt-0.5 ${selected ? 'border-[#84d8ff] bg-[#1cb0f6] text-white' : 'border-[#e5e5e5] text-[#afafaf]'}`}>{option.id}</div>
+            <span className="font-medium text-sm sm:text-base leading-relaxed flex-1">{option.text}</span>
+          </div>
+        );
+
+        // --- App Component ---
+
+        function App() {
+          const [page, setPage] = useState('login'); 
+          const [user, setUser] = useState({ name: '', role: '', isAdmin: false });
+          const [dbQuestions, setDbQuestions] = useState([]); 
+          const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+          const [answers, setAnswers] = useState({});
+          const [rawTextSingle, setRawTextSingle] = useState('');
+          const [rawTextMultiple, setRawTextMultiple] = useState('');
+          const [parsedPreview, setParsedPreview] = useState([]);
+          const [toast, setToast] = useState(null);
+          const [showDebug, setShowDebug] = useState(false);
+          const [showClearModal, setShowClearModal] = useState(false);
+          const [quizStartTime, setQuizStartTime] = useState(null);
+          const [quizEndTime, setQuizEndTime] = useState(null);
+          const [questionStartTime, setQuestionStartTime] = useState(null);
+          const [questionDurations, setQuestionDurations] = useState({});
+          
+          const previewRef = useRef(null);
+
+          useEffect(() => {
+            // 从外部JS文件加载题目，不再使用localStorage
+            // 等待外部文件加载完成（如果存在）
+            const loadQuestions = () => {
+              const external = getExternalQuestions();
+              
+              // 根据当前用户角色设置题目
+              if (user.role) {
+                const roleQuestions = user.role === 'ui' ? external.ui : external.visual;
+                setDbQuestions(roleQuestions.length > 0 ? roleQuestions : []);
+              } else {
+                // 初始加载时，加载所有题目（用于管理员预览）
+                setDbQuestions([...external.ui, ...external.visual]);
+              }
+            };
+            
+            // 立即尝试加载
+            loadQuestions();
+            
+            // 延迟再次检查，以防外部文件加载较慢
+            const timer = setTimeout(loadQuestions, 500);
+            return () => clearTimeout(timer);
+          }, [user.role]);
+
+          const showToast = (message, type = 'info') => {
+            setToast({ message, type });
+          };
+
+          const handleLogin = (role) => {
+            if (!user.name.trim()) return showToast("请输入姓名", "error");
+            const isAdmin = ADMIN_NAMES.includes(user.name.trim());
+            setUser(prev => ({ ...prev, role, isAdmin }));
+            
+            if (isAdmin) {
+              setPage('adminConfig');
+            } else {
+              const roleQuestions = dbQuestions.filter(q => q.role === role);
+              if (roleQuestions.length === 0) {
+                return showToast(`题库中没有【${role === 'ui' ? 'UI 组' : '视觉组'}】的题目，请联系管理员`, "error");
+              }
+              setPage('quiz');
+              setCurrentQuestionIndex(0);
+              setAnswers({});
+              setQuizStartTime(Date.now());
+              setQuizEndTime(null);
+              setQuestionStartTime(Date.now());
+              setQuestionDurations({});
+            }
+          };
+
+          const handleParse = () => {
+            try {
+              const parsedSingle = parseQuestionsFromText(rawTextSingle, user.role, 'single');
+              const parsedMultiple = parseQuestionsFromText(rawTextMultiple, user.role, 'multiple');
+              const allParsed = [...parsedSingle, ...parsedMultiple];
+              if (allParsed.length === 0) {
+                showToast("未识别到有效题目，请检查格式", "error");
+                return;
+              }
+              setParsedPreview(allParsed);
+              showToast(`成功解析 ${allParsed.length} 道题目`, "success");
+              
+              setTimeout(() => {
+                previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 100);
+            } catch (e) {
+              console.error(e);
+              showToast("解析出错，请检查文本", "error");
+            }
+          };
+
+          const handleClear = () => {
+            setShowClearModal(true);
+          };
+
+          const handleClearAll = () => {
+            setRawTextSingle('');
+            setRawTextMultiple('');
+            setParsedPreview([]);
+            setShowClearModal(false);
+            showToast("已清空全部输入", "success");
+          };
+
+          const handleClearProblematic = () => {
+            const problematicCount = parsedPreview.filter(q => q.options.length === 0).length;
+            const filtered = parsedPreview.filter(q => q.options.length > 0);
+            setParsedPreview(filtered);
+            setShowClearModal(false);
+            showToast(`已清空 ${problematicCount} 道识别有问题的习题`, "success");
+          };
+
+          const handleSaveConfig = () => {
+            if (parsedPreview.length === 0) return showToast("没有可保存的预览题目", "error");
+            
+            // 混排逻辑：按维度和类型分组，然后随机打乱
+            const grouped = {};
+            parsedPreview.forEach(q => {
+              const dim = q.dimension || '通用维度';
+              const type = q.type || 'multiple';
+              const key = `${dim}_${type}`;
+              if (!grouped[key]) grouped[key] = [];
+              grouped[key].push(q);
+            });
+            
+            // 每个组内随机打乱
+            Object.keys(grouped).forEach(key => {
+              grouped[key] = grouped[key].sort(() => Math.random() - 0.5);
+            });
+            
+            // 组之间也随机打乱
+            const shuffledGroups = Object.keys(grouped).sort(() => Math.random() - 0.5);
+            const shuffledQuestions = shuffledGroups.flatMap(key => grouped[key]);
+            
+            // 生成代码格式，使用固定文件名和window变量
+            const varName = user.role === 'ui' ? 'DEFAULT_QUESTIONS_UI' : 'DEFAULT_QUESTIONS_VISUAL';
+            const fileName = user.role === 'ui' ? 'DEFAULT_QUESTIONS_ui.js' : 'DEFAULT_QUESTIONS_visual.js';
+            const codeString = `window.${varName} = ${JSON.stringify(shuffledQuestions, null, 2)};`;
+            
+            // 创建下载
+            const blob = new Blob([codeString], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast(`已生成代码文件 ${fileName}！共 ${shuffledQuestions.length} 道题目（已混排）。请替换同文件夹中的文件并刷新页面。`, "success");
+            setParsedPreview([]);
+            setRawTextSingle('');
+            setRawTextMultiple('');
+          };
+          
+          const handleDeleteQuestion = (qId) => {
+              if (confirm('确认删除这道题目吗？\n\n注意：删除操作仅在当前会话有效，刷新页面后会恢复。要永久删除，请重新生成并替换外部JS文件。')) {
+                  const newQuestions = dbQuestions.filter(q => q.id !== qId);
+                  setDbQuestions(newQuestions);
+                  showToast("已删除（仅当前会话有效）", "success");
+              }
+          };
+
+          const handleWipeDatabase = () => {
+              if (confirm('⚠️ 警告：确定要清空当前会话的【所有题目】吗？\n\n注意：此操作仅在当前会话有效，刷新页面后会恢复。要永久清空，请删除或清空外部JS文件。')) {
+                  setDbQuestions([]);
+                  showToast("当前会话题库已清空（刷新后恢复）", "success");
+              }
+          }
+
+          const quizQuestions = useMemo(() => {
+            const filtered = dbQuestions.filter(q => q.role === user.role);
+            const grouped = {};
+            filtered.forEach(q => {
+              const dim = q.dimension || '通用维度';
+              const type = q.type || 'multiple';
+              const key = `${dim}_${type}`;
+              if (!grouped[key]) grouped[key] = [];
+              grouped[key].push(q);
+            });
+            Object.keys(grouped).forEach(key => {
+              grouped[key] = grouped[key].sort(() => Math.random() - 0.5);
+            });
+            const shuffledGroups = Object.keys(grouped).sort(() => Math.random() - 0.5);
+            return shuffledGroups.flatMap(key => grouped[key]);
+          }, [dbQuestions, user.role]);
+          
+          const handleOptionClick = (qId, optId) => {
+            const question = quizQuestions.find(q => q.id === qId);
+            const isSingle = question && question.type === 'single';
+            
+            setAnswers(prev => {
+              const current = prev[qId] || [];
+              if (isSingle) {
+                return current.includes(optId) ? { ...prev, [qId]: [] } : { ...prev, [qId]: [optId] };
+              } else {
+                return current.includes(optId) ? { ...prev, [qId]: current.filter(id => id !== optId) } : { ...prev, [qId]: [...current, optId] };
+              }
+            });
+          };
+
+          const commitCurrentQuestionTime = () => {
+            const q = quizQuestions[currentQuestionIndex];
+            if (!q || !questionStartTime) return;
+            const delta = Date.now() - questionStartTime;
+            setQuestionDurations(prev => ({ ...prev, [q.id]: (prev[q.id] || 0) + delta }));
+          };
+
+          useEffect(() => {
+            if (page === 'result' && quizStartTime && !quizEndTime) {
+              setQuizEndTime(Date.now());
+            }
+          }, [page, quizStartTime, quizEndTime]);
+
+          // Modified calculateScore to correctly track max possible scores
+          const calculateScore = () => {
+            let score = 0;
+            let totalMaxScore = 0;
+            const dimensionScores = {};
+            const dimensionMaxScores = {};
+
+            // 1. Initialize data structures based on ALL quiz questions
+            quizQuestions.forEach(q => {
+              const dimKey = q.dimension || '通用维度';
+              if (dimensionScores[dimKey] === undefined) {
+                  dimensionScores[dimKey] = 0;
+                  dimensionMaxScores[dimKey] = 0;
+              }
+              
+              // Calculate max points for this question
+              const points = q.type === 'single' ? 2 : 3;
+              dimensionMaxScores[dimKey] += points;
+              totalMaxScore += points;
+            });
+
+            // 2. Calculate user score
+            quizQuestions.forEach(q => {
+              const userAns = answers[q.id] || [];
+              const correctAns = q.correct || [];
+              const isSingle = q.type === 'single';
+              const points = isSingle ? 2 : 3;
+              
+              const dimKey = q.dimension || '通用维度';
+              
+              let qScore = 0;
+              // Strict matching: no wrong answers, and no missing correct answers
+              const hasWrong = userAns.some(a => !correctAns.includes(a));
+              const missing = correctAns.filter(a => !userAns.includes(a)).length;
+              
+              if (!hasWrong && userAns.length > 0 && missing === 0) {
+                  qScore = points;
+              }
+              
+              score += qScore;
+              dimensionScores[dimKey] += qScore;
+            });
+            
+            return { score, maxScore: totalMaxScore, dimensionScores, dimensionMaxScores };
+          };
+
+          // 飞书 API 配置
+          const FEISHU_CONFIG = {
+            appId: 'cli_a9f9f58238381bde',
+            appSecret: '4d9U9oZgDtoL7PgSHZltgdx13NP8WDVE',
+            appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
+          };
+
+          // 获取飞书 access_token
+          const getFeishuAccessToken = async () => {
+            try {
+              const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  app_id: FEISHU_CONFIG.appId,
+                  app_secret: FEISHU_CONFIG.appSecret
+                })
+              });
+              const data = await response.json();
+              if (data.code === 0) {
+                return data.tenant_access_token;
+              } else {
+                throw new Error(data.msg || '获取 access_token 失败');
+              }
+            } catch (error) {
+              console.error('获取 access_token 错误:', error);
+              throw error;
+            }
+          };
+
+          // 获取表格列表
+          const getFeishuTables = async (accessToken) => {
+            try {
+              const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              const data = await response.json();
+              if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
+                return data.data.items[0].table_id; // 返回第一个表格的 table_id
+              } else {
+                throw new Error(data.msg || '获取表格列表失败');
+              }
+            } catch (error) {
+              console.error('获取表格列表错误:', error);
+              throw error;
+            }
+          };
+
+          // 保存数据到飞书多维表格
+          const saveToFeishu = async (score) => {
+            try {
+              showToast('正在保存数据到飞书...', 'info');
+              
+              // 1. 获取 access_token
+              const accessToken = await getFeishuAccessToken();
+              
+              // 2. 获取表格 ID
+              const tableId = await getFeishuTables(accessToken);
+              
+              // 3. 准备数据
+              const total = quizQuestions.length || 1;
+              let correctCount = 0;
+
+              const answerDetails = quizQuestions.map(q => {
+                const userSelection = answers[q.id] || [];
+                const correctSelection = q.correct || [];
+                const isCorrect = userSelection.length === correctSelection.length && userSelection.every(a => correctSelection.includes(a));
+                if (isCorrect) correctCount += 1;
+                return {
+                  id: q.id,
+                  question: q.question,
+                  dimension: q.dimension,
+                  userSelection: userSelection.join(', '),
+                  correctSelection: correctSelection.join(', '),
+                  isCorrect: isCorrect ? '是' : '否',
+                  explanation: q.explanation,
+                  questionDurationMs: questionDurations[q.id] || 0,
+                };
+              });
+
+              const correctRate = Number(((correctCount / total) * 100).toFixed(2));
+              const durationMs = quizStartTime ? ((quizEndTime || Date.now()) - quizStartTime) : null;
+              const durationMinutes = durationMs ? Math.floor(durationMs / 60000) : 0;
+              const durationSeconds = durationMs ? Math.floor((durationMs % 60000) / 1000) : 0;
+              const durationText = `${durationMinutes}分${durationSeconds}秒`;
+
+              // 4. 构建记录数据（根据飞书表格的字段结构）
+              const recordData = {
+                fields: {
+                  '姓名': user.name,
+                  '角色': user.role === 'ui' ? 'UI组' : '视觉组',
+                  '得分': score,
+                  '总分': quizQuestions.reduce((sum, q) => sum + (q.type === 'single' ? 2 : 3), 0),
+                  '正确率': `${correctRate}%`,
+                  '用时': durationText,
+                  '完成时间': new Date().toLocaleString('zh-CN'),
+                  '答题详情': JSON.stringify(answerDetails, null, 2)
+                }
+              };
+
+              // 5. 写入数据到飞书表格
+              const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(recordData)
+              });
+
+              const result = await response.json();
+              
+              if (result.code === 0) {
+                showToast(`数据已成功保存到飞书！得分：${score}`, 'success');
+                return true;
+              } else {
+                throw new Error(result.msg || '保存数据失败');
+              }
+            } catch (error) {
+              console.error('保存到飞书错误:', error);
+              showToast(`保存失败：${error.message}`, 'error');
+              return false;
+            }
+          };
+
+          const downloadResults = (score) => {
+            const total = quizQuestions.length || 1;
+            let correctCount = 0;
+
+            const answerDetails = quizQuestions.map(q => {
+              const userSelection = answers[q.id] || [];
+              const correctSelection = q.correct || [];
+              const isCorrect = userSelection.length === correctSelection.length && userSelection.every(a => correctSelection.includes(a));
+              if (isCorrect) correctCount += 1;
+              return {
+                id: q.id,
+                question: q.question,
+                dimension: q.dimension,
+                userSelection,
+                correctSelection,
+                isCorrect,
+                explanation: q.explanation,
+                questionDurationMs: questionDurations[q.id] || 0,
+              };
+            });
+
+            const correctRate = Number(((correctCount / total) * 100).toFixed(2));
+
+            const exportData = {
+              meta: { 
+                timestamp: new Date().toISOString(), 
+                user: user.name, 
+                role: user.role, 
+                score,
+                correctRate,
+                durationMs: quizStartTime ? ((quizEndTime || Date.now()) - quizStartTime) : null
+              },
+              answers: answerDetails
+            };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `onion_assessment_${user.name}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          };
+
+          const handleFinish = async () => {
+            const { score } = calculateScore();
+            const success = await saveToFeishu(score);
+            if (success) {
+              setTimeout(() => {
+                setUser({ name: '', role: '', isAdmin: false });
+                setAnswers({});
+                setPage('login');
+                setQuizStartTime(null);
+                setQuizEndTime(null);
+                setQuestionStartTime(null);
+                setQuestionDurations({});
+              }, 2000);
+            }
+          };
+
+        const formatDuration = (ms) => {
+          if (!ms || ms < 0) return <span>0<span className="text-lg ml-0.5">s</span></span>;
+          const totalSeconds = Math.floor(ms / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+          return (
+            <span>
+              {minutes}<span className="text-lg ml-0.5 mr-1">min</span>
+              {seconds.toString().padStart(2, '0')}<span className="text-lg ml-0.5">s</span>
+            </span>
+          );
+        };
+
+          // --- Views (Updated Layout for Full Screen Lines) ---
+
+          const renderLogin = () => (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-white p-6 w-full">
+              <div className="max-w-2xl w-full flex flex-col items-center">
+                <div className="mb-8 text-center">
+                  <div className="h-24 w-auto mx-auto object-contain animate-bounce flex justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" fill="none" version="1.1" width="256" height="255.99998474121094" viewBox="0 0 256 255.99998474121094" className="h-full w-auto">
+                      <defs>
+                        <clipPath id="master_svg0_5703_009215"><rect x="0" y="0" width="256" height="255.99998474121094" rx="0"/></clipPath>
+                        <linearGradient x1="0.9775724411010742" y1="0.014875861816108227" x2="0.3948344886302948" y2="0.6075482964515686" id="master_svg1_4774_009837">
+                          <stop offset="0%" stopColor="#221211" stopOpacity="1"/>
+                          <stop offset="100%" stopColor="#47281A" stopOpacity="1"/>
+                        </linearGradient>
+                        <linearGradient x1="0.03758620843291283" y1="0.029731035232543945" x2="0.6203241348266602" y2="0.6223999857902528" id="master_svg2_4774_009841">
+                          <stop offset="0%" stopColor="#221211" stopOpacity="1"/>
+                          <stop offset="100%" stopColor="#47281A" stopOpacity="1"/>
+                        </linearGradient>
+                      </defs>
+                      <g clipPath="url(#master_svg0_5703_009215)">
+                        <path d="M212.39724596496583,80.17701841583252C195.70167596496583,58.24639241583252,183.6752059649658,61.50061941583252,179.14759596496583,32.63708021583252C178.01568596496583,25.56268551583252,162.0275459649658,29.94880871583252,150.99150596496582,36.03279341583252C148.3032459649658,37.58915941583252,144.90752596496583,36.74023241583252,143.06816596496583,34.19344641583252C139.24800596496584,28.67541551583252,135.1448359649658,24.855245815832518,129.62681596496583,23.581852455832518C128.35344596496583,23.29888093483252,126.93856596496582,23.29888093483252,125.66515596496582,23.581852455832518C120.28860696496582,24.855245815832518,116.04397796496582,28.53392931583252,112.36528996496583,34.05196041583252C110.66744396496583,36.59874741583252,107.27172996496581,37.44767241583252,104.58345996496583,35.89130641583252C93.54740296496583,29.80732251583252,77.55927096496582,25.42119951583252,76.56886096496582,32.49559591583252C72.18273696496581,61.50061941583252,60.01477596496582,58.24639241583252,43.319200964965816,80.17701841583252C31.00975606496582,95.88217641583252,21.81303596496582,116.82238441583252,21.81303596496582,142.43170841583253C21.81303596496582,194.07479841583253,63.69346396496582,232.5595184158325,127.92897596496582,232.5595184158325C192.16450596496583,232.5595184158325,234.0449059649658,194.07479841583253,234.0449059649658,142.43170841583253C233.90341596496583,116.82238441583252,224.70669596496583,95.88217641583252,212.39724596496583,80.17701841583252Z" fill="#1EB2FF" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <path d="M104.86644398364257,155.87306056689454C104.44197798364257,137.76260256689454,92.55699898364259,126.30209380689453,73.17314898364258,125.73612916689453C57.18500998364258,125.31166109689453,45.86598758364258,137.76260256689454,47.42234161364258,153.32627256689454C48.83722078364258,166.76762356689454,61.00517898364258,179.21856656689454,75.86140998364257,180.35047156689453C91.56657798364259,181.62385556689452,105.29091298364258,172.28564456689452,104.86644398364257,155.87306056689454Z" fill="#FFFFFF" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <path d="M83.50176994921875,127.71695137023926C84.20921094921874,127.71695137023926,84.91665094921875,127.71695137023926,85.62408994921876,127.85844792023926C95.38675694921875,131.25414947023927,101.75371594921876,138.32854537023925,104.01751694921876,148.37419537023925C104.01751694921876,159.69322937023927,94.82080494921875,168.74844537023927,83.50176994921875,168.74844537023927C72.18273734921875,168.74844537023927,62.98602294921875,159.55173337023925,62.98602294921875,148.23269837023926C62.98602294921875,136.91366577023925,72.18273734921875,127.71695137023926,83.50176994921875,127.71695137023926Z" fill="url(#master_svg1_4774_009837)" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <ellipse cx="83.07730293273926" cy="147.80823135375977" rx="10.861594200134277" ry="10.861594200134277" fill="#000000" fillOpacity="1" style={{opacity:0.5}}/>
+                        <ellipse cx="73.65794515609741" cy="146.83155632019043" rx="5.484809398651123" ry="4.211477279663086" fill="#FFFFFF" fillOpacity="1" style={{mixBlendMode:"passthrough"}} transform="matrix(0.796500027179718,-0.6046000123023987,0.6046000123023987,0.796500027179718,-72.45514527862872,70.44268592229957)"/>
+                        <path d="M233.90342193237305,142.4317126220703C233.90342193237305,139.0360117220703,233.62046193237305,135.6402890220703,233.33747193237303,132.3860626220703C226.54608193237306,163.9378716220703,206.31327193237306,203.9789586220703,154.24571193237304,214.59055362207033C100.33882493237304,225.4851146220703,57.89244993237305,205.11086262207033,36.66926193237305,191.3865396220703C54.21376593237305,216.57139562207033,86.33151993237306,232.55953262207032,127.64599993237304,232.55953262207032C192.02302193237304,232.70099262207032,233.90342193237305,194.0748026220703,233.90342193237305,142.4317126220703Z" fill="#2299FF" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <path d="M127.7874825,23.440366743749998C128.4949225,23.440366743749998,129.06086249999998,23.58185194375,129.7683025,23.72333814375C135.14484249999998,24.99673134375,139.38949250000002,28.81690134375,143.2096525,34.33493234375C144.3415725,36.03278334375,146.1809125,36.88171934375,148.1617325,36.88171934375C149.1521425,36.88171934375,150.1425525,36.59874734375,151.1329925,36.17428034375C158.2073825,32.35411034375,167.2625925,29.09988334375,173.2051125,29.09988334375C176.6008125,29.09988334375,179.0061225,30.09029434375,179.2890925,32.778568343749996C183.8166925,61.64210134375,195.8431725,58.38787834375,212.5387725,80.31850434375C224.8481925,96.02365834375,234.0448925,116.96386234375,234.0448925,142.57319234375C234.0448925,194.21628234375,192.1644725,232.70097234375,127.9289825,232.70097234375C63.6934625,232.70097234375,21.8130417,194.21628234375,21.8130417,142.57319234375C21.8130417,116.96386234375,31.0097565,96.02365834375,43.3192005,80.31850434375C60.0147785,58.24639534375,72.1827355,61.50061834375,76.5688625,32.63708134375C76.9933315,30.09029434375,79.3986205,28.95839734375,82.6528475,28.95839734375C88.5953365,28.95839734375,97.5090785,32.212623343749996,104.5834735,36.03279334375C105.4323955,36.45726034375,106.4228135,36.74023234375,107.4132235,36.74023234375C109.3940655,36.74023234375,111.2334065,35.89130734375,112.3653105,34.19344734375C116.0439925,28.67541534375,120.2886425,24.99673134375,125.6651725,23.72333814375C126.3726025,23.440366743749998,127.0800525,23.440366743749998,127.7874825,23.440366743749998ZM127.7874825,14.24365234375C126.3726025,14.24365234375,125.0992225,14.38513809375,123.6843425,14.66811499375C117.1758925,16.22447994375,111.5163875,20.18614054375,106.5643005,26.55309634375C99.4899135,23.01589874375,90.1517105,19.761678243749998,82.7943425,19.761678243749998C72.8901905,19.761678243749998,68.5040625,25.704172343750002,67.65513949999999,31.08070534375C65.2498285,46.50289934375,61.1466755,50.04010034375,53.2233545,56.83151234375C48.4127655,60.93466234375,42.470273500000005,66.02822834375,36.1033175,74.65898934375C20.8226242,94.32580534375,12.7578125,117.67131234375,12.7578125,142.43171234375C12.7578125,170.44632234375,24.218332500000002,195.77264234375,44.8755765,213.74162234375C65.9572795,231.99354234375,94.6793135,241.75622234375,127.9289825,241.75622234375C161.3201325,241.75622234375,190.0421925,232.13504234375,211.1238825,213.74162234375C231.7811425,195.77264234375,243.2416225,170.44630234375,243.2416225,142.43171234375C243.2416225,117.67132234375,235.1768325,94.18433334375,219.8961225,74.65900034375C213.3876625,66.16972334375001,207.4452025,61.07616434375,202.7760625,56.83152434375C194.8527325,49.89861334375,190.7496025,46.50289934375,188.4857925,31.22221134375C187.6368525,25.70418234375,183.2507525,19.90317964375,173.3465925,19.90317964375C165.8477125,19.90317964375,156.5095325,23.29889204375,149.4351325,26.83609034375C144.4830625,20.327647643749998,138.8235425,16.36598184375,132.3150925,14.80961698375C130.4757625,14.38513809375,129.2023625,14.24365234375,127.7874825,14.24365234375Z" fill="#0064FF" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <path d="M150.85000925228437,155.87306056689454C151.27447733398438,137.76260256689454,163.15945358398437,126.30209380689453,182.54329458398436,125.73612916689453C198.5314295839844,125.31166109689453,209.85046358398438,137.76260256689454,208.29409058398437,153.32627256689454C206.87920758398437,166.76762356689454,194.71124258398436,179.21856656689454,179.85501058398438,180.35047156689453C164.14986558398437,181.62385556689452,150.42554119398437,172.28564456689452,150.85000925228437,155.87306056689454Z" fill="#FFFFFF" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <path d="M172.21469240309906,127.71695137023926C171.50725340309907,127.71695137023926,170.79981340309905,127.71695137023926,170.09237440309906,127.85844792023926C160.32971700309906,131.25414947023927,153.96276060309907,138.32854537023925,151.69894540309906,148.37419537023925C151.69894540309906,159.69322937023927,160.89565980309905,168.74844537023927,172.21469240309906,168.74844537023927C183.53372740309905,168.74844537023927,192.73043940309907,159.55173337023925,192.73043940309907,148.23269837023926C192.73043940309907,136.91366577023925,183.53372740309905,127.71695137023926,172.21469240309906,127.71695137023926Z" fill="url(#master_svg2_4774_009841)" fillOpacity="1" style={{mixBlendMode:"passthrough"}}/>
+                        <ellipse cx="172.6391395330429" cy="147.80823135375977" rx="10.861594200134277" ry="10.861594200134277" fill="#000000" fillOpacity="1" style={{opacity:0.5}}/>
+                        <ellipse cx="164.33846807479858" cy="146.80260467529297" rx="5.484809398651123" ry="4.211477279663086" fill="#FFFFFF" fillOpacity="1" style={{mixBlendMode:"passthrough"}} transform="matrix(0.796500027179718,-0.6046000123023987,0.6046000123023987,0.796500027179718,-53.984157164482895,125.26223953558451)"/>
+                      </g>
+                    </svg>
+                  </div>
+                  <h1 className="text-2xl font-black text-[#4b4b4b] mt-4">洋葱学园 UED<br/>AI 技能考核 <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded">Local v7.0</span></h1>
+                </div>
+                <div className="w-full space-y-4"> 
+                  <input 
+                    type="text" value={user.name} onChange={e => setUser({...user, name: e.target.value})}
+                    placeholder="请输入真实姓名"
+                    className="w-full p-4 bg-[#f7f7f7] border-2 border-[#e5e5e5] rounded-xl font-bold text-lg focus:border-[#58cc02] outline-none text-left"
+                  />
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <button onClick={() => handleLogin('ui')} className="p-6 border-2 border-[#e5e5e5] rounded-2xl hover:bg-[#f0f0f0] border-b-4 active:border-b-2 active:translate-y-1 flex flex-col items-center group">
+                      <Icons.Monitor className="w-10 h-10 text-[#1cb0f6] mb-2 group-hover:scale-110 transition-transform" />
+                      <span className="font-extrabold text-[#4b4b4b]">UI 组</span>
+                    </button>
+                    <button onClick={() => handleLogin('visual')} className="p-6 border-2 border-[#e5e5e5] rounded-2xl hover:bg-[#f0f0f0] border-b-4 active:border-b-2 active:translate-y-1 flex flex-col items-center group">
+                      <Icons.Image className="w-10 h-10 text-[#ff9600] mb-2 group-hover:scale-110 transition-transform" />
+                      <span className="font-extrabold text-[#4b4b4b]">视觉组</span>
+                    </button>
+                  </div>
+                  {ADMIN_NAMES.includes(user.name.trim()) && <p className="text-center text-xs text-[#58cc02] font-bold mt-4 animate-pulse">* 检测到管理员身份，进入将开启配置模式</p>}
+                </div>
+              </div>
+            </div>
+          );
+
+          const renderAdminConfig = () => {
+              const currentRoleQuestions = dbQuestions.filter(q => q.role === user.role);
+
+              return (
+            <div className="flex flex-col h-screen w-full bg-white">
+              {/* Header: Full Width Border */}
+              <div className="w-full border-b border-gray-100 bg-white sticky top-0 z-10">
+                <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Icons.Settings className="text-[#58cc02]" size={20} />
+                    <div><h2 className="font-black text-[#4b4b4b] text-lg">本地题库配置</h2><p className="text-xs text-[#afafaf] font-bold uppercase">配置角色：{user.role === 'ui' ? 'UI 组' : '视觉组'}</p></div>
+                  </div>
+                  <button onClick={() => setPage('login')} className="text-[#afafaf] hover:text-[#ff4b4b] font-bold text-sm">退出</button>
+                </div>
+              </div>
+              
+              {/* Content: Centered */}
+              <div className="flex-1 w-full overflow-y-auto scroll-smooth">
+                <div className="max-w-2xl mx-auto px-6 py-6 space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-bold text-[#4b4b4b] flex items-center gap-2">
+                        <span className="px-3 py-1 bg-[#7A64FF] text-white rounded-lg text-xs">单选题</span>
+                        单选题录入区域
+                      </label>
+                      <textarea value={rawTextSingle} onChange={(e) => setRawTextSingle(e.target.value)} placeholder="粘贴单选题文本..." className="w-full h-48 p-4 bg-[#f7f7f7] border-2 border-[#e5e5e5] rounded-xl focus:border-[#7A64FF] outline-none font-mono text-sm resize-none" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-bold text-[#4b4b4b] flex items-center gap-2">
+                        <span className="px-3 py-1 bg-[#FF965E] text-white rounded-lg text-xs">多选题</span>
+                        多选题录入区域
+                      </label>
+                      <textarea value={rawTextMultiple} onChange={(e) => setRawTextMultiple(e.target.value)} placeholder="粘贴多选题文本..." className="w-full h-48 p-4 bg-[#f7f7f7] border-2 border-[#e5e5e5] rounded-xl focus:border-[#FF965E] outline-none font-mono text-sm resize-none" />
+                    </div>
+                  </div>
+                  
+                  {/* Debug */}
+                  <div className="flex justify-end">
+                    <button onClick={() => setShowDebug(!showDebug)} className="text-xs text-gray-400 underline">
+                      {showDebug ? '隐藏数据结构' : '查看数据结构 (Debug)'}
+                    </button>
+                  </div>
+
+                  {showDebug && parsedPreview.length > 0 && (
+                     <pre className="bg-gray-900 text-green-400 p-4 rounded-xl text-xs overflow-auto h-40">
+                       {JSON.stringify(parsedPreview, null, 2)}
+                     </pre>
+                  )}
+
+                  {/* Preview Section */}
+                  <div ref={previewRef}>
+                  {parsedPreview.length > 0 && (
+                    <div className="space-y-4 border-t-2 border-[#e5e5e5] pt-6 animate-[fadeIn_0.5s_ease-out]">
+                      <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-[#4b4b4b] flex items-center gap-2"><Icons.Eye size={18} /> 待保存预览 ({parsedPreview.length} 题)</h3>
+                          <span className="text-xs text-[#58cc02] font-bold animate-pulse">检测到新题目，请点击底部保存！</span>
+                      </div>
+                      <div className="space-y-3">{parsedPreview.map((q, idx) => {
+                        const isSingle = q.type === 'single';
+                        const typeColor = isSingle ? 'bg-[#7A64FF]' : 'bg-[#FF965E]';
+                        const typeText = isSingle ? '单选题' : '多选题';
+                        return (
+                        <div key={idx} className="bg-white border-2 border-[#58cc02] rounded-xl p-4 text-sm relative overflow-hidden shadow-sm">
+                          <div className="mb-3 flex items-center gap-2 flex-wrap">
+                            <span className={`${typeColor} px-2 py-1 text-xs font-bold text-white rounded-lg`}>
+                              {typeText}
+                            </span>
+                            <span className="bg-[#f0f0f0] px-2 py-1 text-xs font-bold text-gray-500 rounded-lg">
+                              {q.dimension}
+                            </span>
+                            <span className="ml-auto text-xs font-mono text-gray-300">NEW</span>
+                          </div>
+                          <div className="mb-3">
+                            <div className="text-xs font-bold text-gray-400 mb-1">题干：</div>
+                            <div className="font-bold text-[#4b4b4b] leading-relaxed">{q.question}</div>
+                          </div>
+                          <div className="mb-3">
+                            <div className="text-xs font-bold text-gray-400 mb-1">选项：</div>
+                            <div className="space-y-1 text-gray-600">
+                              {q.options.length === 0 ? <span className="text-red-500 font-bold">⚠️ 未识别到选项！请检查格式</span> : q.options.map(opt => <div key={opt.id} className="leading-relaxed">{opt.id}. {opt.text}</div>)}
+                            </div>
+                          </div>
+                          <div className="mb-3 pt-2 border-t border-gray-100">
+                            <div className="text-xs font-bold text-gray-400 mb-1">正确答案：</div>
+                            <div className="text-[#58cc02] font-bold">{q.correct.join(', ') || '未设置'}</div>
+                          </div>
+                          <div className="pt-2 border-t border-gray-100">
+                            <div className="text-xs font-bold text-gray-400 mb-1">解析：</div>
+                            <div className="text-gray-600 leading-relaxed">{q.explanation || '暂无解析'}</div>
+                          </div>
+                        </div>
+                      )})}</div>
+                    </div>
+                  )}
+                  </div>
+
+                  {/* Existing Database Section */}
+                  <div className="space-y-4 border-t-2 border-[#e5e5e5] pt-6 pb-20">
+                      <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-[#afafaf] flex items-center gap-2 uppercase text-xs"><Icons.Database size={14} /> 当前已入库题库 ({currentRoleQuestions.length} 题)</h3>
+                          {currentRoleQuestions.length > 0 && (
+                              <button onClick={handleWipeDatabase} className="text-xs text-red-400 hover:text-red-600 font-bold underline">
+                                  一键清空题库
+                              </button>
+                          )}
+                      </div>
+                      
+                      {currentRoleQuestions.length === 0 ? (
+                          <div className="text-center py-8 text-gray-400 text-sm">暂无题目，请在上分录入并解析保存</div>
+                      ) : (
+                          <div className="space-y-3">
+                              {currentRoleQuestions.map((q, idx) => (
+                                <div key={q.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm flex justify-between items-start group hover:border-red-200 transition-colors">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`w-2 h-2 rounded-full ${q.type === 'single' ? 'bg-[#7A64FF]' : 'bg-[#FF965E]'}`}></span>
+                                            <span className="text-gray-900 font-bold line-clamp-1">{idx + 1}. {q.question}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-400 pl-4">{q.dimension}</div>
+                                    </div>
+                                    <button onClick={() => handleDeleteQuestion(q.id)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Icons.Trash2 size={16} />
+                                    </button>
+                                </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Footer: Full Width Border */}
+              <div className="w-full border-t border-[#e5e5e5] bg-white">
+                <div className="max-w-2xl mx-auto p-6 grid grid-cols-2 gap-3">
+                  <DuoButton variant="secondary" onClick={handleParse}>
+                    <Icons.RefreshCw size={18} className="mr-2"/> 解析
+                  </DuoButton>
+                  <DuoButton variant="primary" onClick={handleSaveConfig} disabled={parsedPreview.length === 0}>
+                    <Icons.Save size={18} className="mr-2"/> 保存
+                  </DuoButton>
+                </div>
+              </div>
+              <ClearModal
+                show={showClearModal}
+                onClose={() => setShowClearModal(false)}
+                onClearAll={handleClearAll}
+                onClearProblematic={handleClearProblematic}
+                parsedPreview={parsedPreview}
+              />
+            </div>
+          )};
+
+          const goPrevQuestion = () => {
+            commitCurrentQuestionTime();
+            setCurrentQuestionIndex(prev => prev - 1);
+            setQuestionStartTime(Date.now());
+          };
+
+          const goNextQuestion = (isLast) => {
+            commitCurrentQuestionTime();
+            if (isLast) {
+              setQuestionStartTime(null);
+              setPage('result');
+              setQuizEndTime(Date.now());
+            } else {
+              setCurrentQuestionIndex(prev => prev + 1);
+              setQuestionStartTime(Date.now());
+            }
+          };
+
+          const renderQuiz = () => {
+            const q = quizQuestions[currentQuestionIndex];
+            if (!q) return <div>Loading...</div>;
+            const isFirst = currentQuestionIndex === 0;
+            const isLast = currentQuestionIndex === quizQuestions.length - 1;
+            const dimensionQuestions = quizQuestions.filter(i => i.dimension === q.dimension);
+            const currentInDim = dimensionQuestions.findIndex(i => i.id === q.id) + 1;
+            const currentHasAnswer = answers[q.id] && answers[q.id].length > 0;
+
+            return (
+              <div className="flex flex-col h-screen w-full bg-white">
+                {/* Header: Full Width */}
+                <div className="w-full border-b border-gray-100 bg-white">
+                  <div className="max-w-2xl mx-auto px-6 py-6">
+                    <div className="w-full h-4 bg-[#e5e5e5] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#58cc02] transition-all duration-300" style={{ width: `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content: Centered */}
+                <div className="flex-1 w-full overflow-y-auto">
+                  <div className="max-w-2xl mx-auto px-6 py-4">
+                    <div className="flex items-center gap-2 mb-4 flex-wrap">
+                      {q.type && (
+                        <div className={`inline-block px-3 py-1 ${q.type === 'single' ? 'bg-[#7A64FF]' : 'bg-[#FF965E]'} text-white rounded-lg text-xs font-extrabold uppercase`}>
+                          {q.type === 'single' ? '单选题' : '多选题'}
+                        </div>
+                      )}
+                      <div className="inline-block px-3 py-1 bg-[#ff9600]/10 text-[#ff9600] rounded-lg text-xs font-extrabold uppercase">{q.dimension || '通用'} · {currentInDim}/{dimensionQuestions.length}</div>
+                    </div>
+                    <h2 className="text-xl font-bold text-[#4b4b4b] mb-6">{q.question}</h2>
+                    <div className="space-y-3 pb-8">
+                      {q.options.map(opt => <OptionCard key={opt.id} option={opt} selected={answers[q.id]?.includes(opt.id)} onClick={() => handleOptionClick(q.id, opt.id)} />)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer: Full Width */}
+                <div className="w-full border-t border-[#e5e5e5] bg-white">
+                  <div className="max-w-2xl mx-auto p-6 flex gap-3">
+                    <DuoButton variant="secondary" fullWidth disabled={isFirst} onClick={goPrevQuestion}>上一题</DuoButton>
+                    <DuoButton variant="primary" fullWidth disabled={!currentHasAnswer} onClick={() => goNextQuestion(isLast)}>{isLast ? '提交' : '下一题'}</DuoButton>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          const renderResult = () => {
+            const { score, maxScore, dimensionScores, dimensionMaxScores } = calculateScore();
+            const durationMs = quizStartTime && (quizEndTime || Date.now()) ? (quizEndTime || Date.now()) - quizStartTime : null;
+            
+            // Sort dimensions by numeric value if present in string (e.g. "Dimension 1")
+            const sortedDimensions = Object.keys(dimensionScores).sort((a, b) => {
+                const numA = parseInt(a.match(/\d+/)?.[0] || '999');
+                const numB = parseInt(b.match(/\d+/)?.[0] || '999');
+                return numA - numB;
+            });
+
+            return (
+              <div className="flex flex-col h-screen w-full bg-white">
+                <div className="flex-1 w-full overflow-y-auto">
+                  <div className="max-w-2xl mx-auto p-5">
+                    
+                    {/* Header - Simplified */}
+                    <div className="text-center mb-6 pt-2">
+                        <div className="inline-flex items-center justify-center p-4 bg-[#fff9e6] rounded-full border-4 border-white shadow-xl mb-4">
+                            <Icons.Trophy size={48} className="text-[#ffc800]" />
+                        </div>
+                        <h2 className="text-3xl font-black text-[#4b4b4b]">考核完成</h2>
+                        <p className="text-[#afafaf] font-bold mt-1">你的能力评估报告已生成</p>
+                    </div>
+
+                    {/* Score Summary */}
+                    <div className="w-full bg-white rounded-3xl border-2 border-[#e5e5e5] p-6 mb-6 shadow-sm flex items-center justify-between text-center divide-x-2 divide-[#e5e5e5]">
+                      <div className="flex-1 px-2">
+                          <div className="text-xs font-bold text-[#afafaf] uppercase tracking-wider mb-2">总得分</div>
+                          <div className="text-3xl font-black text-[#1cb0f6]">{score}</div>
+                      </div>
+                      <div className="flex-1 px-2">
+                          <div className="text-xs font-bold text-[#afafaf] uppercase tracking-wider mb-2">试卷总分</div>
+                          <div className="text-3xl font-bold text-[#4b4b4b]">{maxScore}</div>
+                      </div>
+                      <div className="flex-1 px-2">
+                          <div className="text-xs font-bold text-[#afafaf] uppercase tracking-wider mb-2">用时</div>
+                          <div className="text-3xl font-bold text-[#4b4b4b]">{formatDuration(durationMs)}</div>
+                      </div>
+                    </div>
+
+                    {/* Dimensions List */}
+                    <div className="space-y-3 pb-6">
+                        <h3 className="text-sm font-bold text-[#afafaf] mb-3">
+                            维度能力明细
+                        </h3>
+                        {sortedDimensions.map(dim => {
+                            const s = dimensionScores[dim];
+                            const m = dimensionMaxScores[dim];
+                            const percent = m > 0 ? (s / m) * 100 : 0;
+                            let color = 'bg-[#ff4b4b]'; // red
+                            if (percent >= 80) color = 'bg-[#58cc02]'; // green
+                            else if (percent >= 60) color = 'bg-[#ff9600]'; // orange
+                            else if (percent >= 40) color = 'bg-[#ffc800]'; // yellow
+
+                            return (
+                                <div key={dim} className="bg-white border-2 border-[#e5e5e5] rounded-2xl p-4 transition-all hover:border-[#1cb0f6]/50">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-[#4b4b4b] text-sm">{dim}</span>
+                                        <span className="font-bold text-[#4b4b4b] text-sm">
+                                            <span className={`${percent === 100 ? 'text-[#58cc02]' : ''}`}>{s}</span>
+                                            <span>/{m}</span>
+                                        </span>
+                                    </div>
+                                    <div className="w-full h-3 bg-[#f0f0f0] rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full ${color} transition-all duration-1000 ease-out`} 
+                                            style={{ width: `${percent}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="w-full border-t border-[#e5e5e5] bg-white">
+                  <div className="max-w-2xl mx-auto p-6 flex gap-3">
+                    <DuoButton variant="secondary" fullWidth onClick={() => setPage('review')}><Icons.Eye size={20} /> 查看解析</DuoButton>
+                    <DuoButton variant="primary" fullWidth onClick={handleFinish}><Icons.Save size={20} /> 保存</DuoButton>
+                  </div>
+                </div>
+              </div>
+            );
+          };
+
+          const renderReview = () => (
+            <div className="flex flex-col h-screen w-full bg-white">
+              {/* Header */}
+              <div className="w-full border-b border-[#e5e5e5] bg-white sticky top-0 z-10">
+                <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
+                  <button onClick={() => setPage('result')}><Icons.ChevronLeft size={28} className="text-[#afafaf]" /></button><h2 className="font-bold text-[#4b4b4b]">全卷解析</h2>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 w-full overflow-y-auto">
+                <div className="max-w-2xl mx-auto p-6 space-y-6">
+                  {quizQuestions.map((q, idx) => {
+                    const userAns = answers[q.id] || [];
+                    const isCorrect = userAns.length === q.correct.length && userAns.every(a => q.correct.includes(a));
+                    const isSingle = q.type === 'single';
+                    const typeColor = isSingle ? 'bg-[#7A64FF]' : 'bg-[#FF965E]';
+                    const typeText = isSingle ? '单选题' : '多选题';
+                    return (
+                      <div key={q.id} className="bg-white rounded-2xl border-2 border-[#e5e5e5] overflow-hidden">
+                        <div className="p-4 border-b-2 border-[#e5e5e5] flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-extrabold text-[#afafaf]">Q{idx + 1}</span>
+                            {q.type && (
+                              <span className={`px-2 py-1 ${typeColor} text-white rounded text-xs font-bold`}>
+                                {typeText}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs font-bold text-white ${isCorrect ? 'bg-[#58cc02]' : 'bg-[#ff4b4b]'}`}>{isCorrect ? 'CORRECT' : 'WRONG'}</span>
+                        </div>
+                        <div className="p-4 font-bold text-[#4b4b4b]">{q.question}</div>
+                        <div className="px-4 pb-4 text-sm space-y-1"><div>你的答案：<span className={isCorrect ? 'text-[#58cc02] font-mono font-bold' : 'text-[#ff4b4b] font-mono font-bold'}>{userAns.join(', ') || '未作答'}</span></div><div>正确答案：<span className="text-[#58cc02] font-mono font-bold">{q.correct.join(', ')}</span></div></div>
+                        <div className="p-4 bg-[#ddf4ff] border-t-2 border-[#84d8ff] text-[#1899d6] text-sm"><span className="font-extrabold">💡 解析: </span>{q.explanation}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+
+          return (
+            <div className="font-sans antialiased text-gray-900 bg-white min-h-screen">
+              {page === 'login' && renderLogin()}
+              {page === 'adminConfig' && renderAdminConfig()}
+              {page === 'quiz' && renderQuiz()}
+              {page === 'result' && renderResult()}
+              {page === 'review' && renderReview()}
+              {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
