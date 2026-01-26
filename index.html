@@ -820,7 +820,6 @@
 
               const result = await response.json();
               console.log('📦 飞书API响应:', result);
-              console.log('📦 飞书API完整响应（JSON）:', JSON.stringify(result, null, 2));
               
               if (result.code === 0) {
                 console.log('✅ 保存成功！');
@@ -828,32 +827,7 @@
                 return true;
               } else {
                 console.error('❌ 飞书API返回错误:', result);
-                // 输出更详细的错误信息
-                if (result.msg) {
-                  console.error('❌ 错误消息:', result.msg);
-                }
-                if (result.error) {
-                  console.error('❌ 错误详情:', result.error);
-                }
-                if (result.data) {
-                  console.error('❌ 错误数据:', result.data);
-                }
-                // 输出当前发送的字段名和值
-                console.error('❌ 当前发送的字段名:', Object.keys(recordData.fields));
-                console.error('❌ 当前发送的完整数据:', JSON.stringify(recordData, null, 2));
-                
-                // 如果是字段名错误，尝试提取具体字段名
-                let errorMsg = result.msg || `保存数据失败: code=${result.code}`;
-                if (result.msg && result.msg.includes('FieldNameNotFound')) {
-                  // 尝试从错误信息中提取字段名
-                  const fieldMatch = result.msg.match(/FieldNameNotFound[:\s]+([^\s,]+)/i);
-                  if (fieldMatch) {
-                    errorMsg = `字段名不匹配: 字段 "${fieldMatch[1]}" 在飞书表格中不存在。当前发送的字段名: ${Object.keys(recordData.fields).join(', ')}`;
-                  } else {
-                    errorMsg = `字段名不匹配: ${result.msg}。当前发送的字段名: ${Object.keys(recordData.fields).join(', ')}。请检查控制台中的"飞书表格实际字段名列表"进行对比。`;
-                  }
-                }
-                throw new Error(errorMsg);
+                throw new Error(result.msg || `保存数据失败: code=${result.code}`);
               }
             } catch (error) {
               console.error('❌ 保存到飞书错误:', error);
