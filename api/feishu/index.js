@@ -60,6 +60,10 @@ module.exports = async (req, res) => {
     if (action === 'saveRecord') {
       // 保存记录
       const { accessToken, tableId, recordData } = params;
+      console.log('💾 保存记录 - 表格ID:', tableId);
+      console.log('💾 保存记录 - 字段名:', Object.keys(recordData.fields || {}));
+      console.log('💾 保存记录 - 完整数据:', JSON.stringify(recordData, null, 2));
+      
       const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`, {
         method: 'POST',
         headers: {
@@ -70,6 +74,16 @@ module.exports = async (req, res) => {
       });
 
       const data = await response.json();
+      console.log('📦 飞书API响应状态:', response.status);
+      console.log('📦 飞书API响应数据:', JSON.stringify(data, null, 2));
+      
+      if (data.code !== 0) {
+        console.error('❌ 飞书API错误:', data.msg || data.error || '未知错误');
+        if (data.msg && data.msg.includes('FieldNameNotFound')) {
+          console.error('❌ 字段名不匹配！当前字段名:', Object.keys(recordData.fields || {}));
+        }
+      }
+      
       return res.status(200).json(data);
     }
 
