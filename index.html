@@ -657,68 +657,19 @@
             return { score, maxScore: totalMaxScore, dimensionScores, dimensionMaxScores };
           };
 
-          // 飞书 API 配置（直接从浏览器调用，使用 CORS 代理）
+          // 飞书 API 配置（通过本地代理服务器或 Vercel Functions）
           const FEISHU_CONFIG = {
-            appId: 'cli_a9f9f58238381bde',
-            appSecret: '4d9U9oZgDtoL7PgSHZltgdx13NP8WDVE',
             appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
           };
 
-          // 直接调用飞书 API（尝试多种方式）
-          const callFeishuAPI = async (url, options) => {
-            // 方案1：先尝试直接调用（飞书 API 可能支持 CORS）
-            try {
-              const response = await fetch(url, {
-                ...options,
-                mode: 'cors'
-              });
-              if (response.ok) {
-                return response;
-              }
-            } catch (directError) {
-              console.log('直接调用失败:', directError.message);
+          // 获取代理API地址（自动检测环境）
+          const getProxyUrl = () => {
+            // 检测是否在本地开发环境（localhost）
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+              return 'http://localhost:3000/api/feishu';
             }
-            
-            // 方案2：使用支持 POST 的 CORS 代理
-            const proxyServices = [
-              `https://corsproxy.io/?${encodeURIComponent(url)}`,
-              `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-            ];
-            
-            for (const proxyUrl of proxyServices) {
-              try {
-                console.log('尝试 CORS 代理:', proxyUrl);
-                // 对于代理服务，需要特殊处理
-                if (proxyUrl.includes('allorigins.win')) {
-                  // allorigins 需要特殊处理 POST 请求
-                  const response = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                      method: options.method || 'GET',
-                      url: url,
-                      headers: options.headers || {},
-                      body: options.body
-                    })
-                  });
-                  if (response.ok) {
-                    return response;
-                  }
-                } else {
-                  const response = await fetch(proxyUrl, options);
-                  if (response.ok) {
-                    return response;
-                  }
-                }
-              } catch (proxyError) {
-                console.log('代理服务失败:', proxyError.message);
-                continue;
-              }
-            }
-            
-            throw new Error('所有 CORS 代理服务都失败，请检查网络或使用本地代理服务器');
+            // 生产环境使用相对路径（Vercel Functions）
+            return '/api/feishu';
           };
 
           // 获取飞书 access_token（通过代理）
