@@ -1,6 +1,6 @@
 // Vercel Serverless Function - 飞书API代理
-// 此文件作为备选方案，如果 api/feishu/index.js 不工作，Vercel 会使用此文件
-module.exports = async function handler(req, res) {
+// 标准格式：module.exports 导出 handler 函数
+module.exports = async (req, res) => {
   // 设置CORS头
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
