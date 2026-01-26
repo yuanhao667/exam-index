@@ -796,6 +796,43 @@
               };
               
               console.log('📝 步骤3: 准备保存的数据:', JSON.stringify(recordData, null, 2));
+              console.log('📝 步骤3: 使用的字段名:', Object.keys(recordData.fields));
+              
+              // 3.5. 获取表格字段定义（用于诊断字段名问题）
+              try {
+                console.log('📝 步骤3.5: 获取表格字段定义（用于诊断）...');
+                const fieldsResponse = await fetch(getProxyUrl(), {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    action: 'getFields',
+                    accessToken: accessToken,
+                    tableId: tableId
+                  })
+                });
+                const fieldsData = await fieldsResponse.json();
+                if (fieldsData.code === 0 && fieldsData.data && fieldsData.data.items) {
+                  console.log('📋 飞书表格实际字段名列表:');
+                  const actualFieldNames = fieldsData.data.items.map(f => f.field_name);
+                  actualFieldNames.forEach(name => {
+                    console.log(`  - "${name}"`);
+                  });
+                  console.log('📋 代码使用的字段名:', Object.keys(recordData.fields));
+                  // 检查字段名是否匹配
+                  const codeFieldNames = Object.keys(recordData.fields);
+                  const missingFields = codeFieldNames.filter(f => !actualFieldNames.includes(f));
+                  if (missingFields.length > 0) {
+                    console.error('❌ 字段名不匹配！以下字段在飞书表格中不存在:', missingFields);
+                    console.error('💡 请检查字段名是否完全一致（包括空格、特殊字符、大小写）');
+                  } else {
+                    console.log('✅ 字段名检查通过');
+                  }
+                }
+              } catch (fieldsError) {
+                console.warn('⚠️ 获取字段定义失败（不影响保存）:', fieldsError);
+              }
 
               // 5. 写入数据到飞书表格（通过代理）
               console.log('📝 步骤4: 发送保存请求...');

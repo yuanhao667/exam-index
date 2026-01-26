@@ -57,6 +57,28 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
+    if (action === 'getFields') {
+      // 获取表格字段定义
+      const { accessToken, tableId } = params;
+      console.log('📋 获取表格字段定义 - 表格ID:', tableId);
+      const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/fields`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.code === 0 && data.data && data.data.items) {
+        console.log('📋 表格字段列表:');
+        data.data.items.forEach(field => {
+          console.log(`  - ${field.field_name} (${field.field_id}, 类型: ${field.type})`);
+        });
+      }
+      return res.status(200).json(data);
+    }
+
     if (action === 'saveRecord') {
       // 保存记录
       const { accessToken, tableId, recordData } = params;
