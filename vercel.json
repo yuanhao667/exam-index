@@ -1,4 +1,12 @@
 {
+  "functions": {
+    "api/feishu.js": {
+      "runtime": "nodejs18.x"
+    },
+    "api/feishu/index.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api).*)",
