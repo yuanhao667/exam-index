@@ -664,17 +664,68 @@
             appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
           };
 
-          // CORS 代理（用于绕过浏览器 CORS 限制）
-          const corsProxy = (url) => {
-            // 使用公共 CORS 代理服务
-            return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+          // 检测是否在本地环境（使用本地代理服务器）
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          
+          // 获取代理URL（本地使用本地代理，生产环境直接调用）
+          const getProxyUrl = () => {
+            if (isLocal) {
+              return 'http://localhost:3000/api/feishu';
+            }
+            return null; // 生产环境直接调用，不使用代理
           };
 
-          // 直接调用飞书 API（带 CORS 代理后备方案）
+          // 直接调用飞书 API（本地通过代理，生产环境直接调用）
           const callFeishuAPI = async (url, options = {}) => {
+            // 如果是本地环境，使用本地代理服务器
+            if (isLocal) {
+              const proxyUrl = getProxyUrl();
+              console.log('🌐 本地环境：通过本地代理服务器调用');
+              
+              // 根据 URL 判断 action
+              let action = 'saveRecord';
+              if (url.includes('/auth/v3/tenant_access_token')) {
+                action = 'getToken';
+              } else if (url.includes('/tables') && !url.includes('/records') && !url.includes('/fields')) {
+                action = 'getTables';
+              } else if (url.includes('/fields')) {
+                action = 'getFields';
+              }
+              
+              // 构建代理请求体
+              let proxyBody = {
+                action: action
+              };
+              
+              if (action === 'getToken') {
+                // 不需要额外参数
+              } else if (action === 'getTables') {
+                proxyBody.accessToken = options.headers?.['Authorization']?.replace('Bearer ', '');
+              } else if (action === 'getFields') {
+                const tableIdMatch = url.match(/\/tables\/([^\/]+)\/fields/);
+                proxyBody.accessToken = options.headers?.['Authorization']?.replace('Bearer ', '');
+                proxyBody.tableId = tableIdMatch ? tableIdMatch[1] : null;
+              } else if (action === 'saveRecord') {
+                const tableIdMatch = url.match(/\/tables\/([^\/]+)\/records/);
+                proxyBody.accessToken = options.headers?.['Authorization']?.replace('Bearer ', '');
+                proxyBody.tableId = tableIdMatch ? tableIdMatch[1] : null;
+                proxyBody.recordData = JSON.parse(options.body);
+              }
+              
+              const response = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(proxyBody)
+              });
+              
+              return response;
+            }
+            
+            // 生产环境：直接调用飞书 API
             try {
-              // 先尝试直接调用
-              console.log('🌐 尝试直接调用飞书 API:', url);
+              console.log('🌐 生产环境：尝试直接调用飞书 API:', url);
               const directResponse = await fetch(url, {
                 method: options.method || 'GET',
                 headers: {
@@ -690,34 +741,13 @@
                 return directResponse;
               }
               
-              // 如果直接调用失败（可能是 CORS 问题），使用代理
-              console.warn('⚠️ 直接调用失败（状态码:', directResponse.status, '），尝试使用 CORS 代理...');
-              throw new Error('Direct call failed');
+              // 如果直接调用失败，抛出错误
+              console.error('❌ 直接调用失败（状态码:', directResponse.status, '）');
+              const errorText = await directResponse.text();
+              throw new Error(`HTTP error! status: ${directResponse.status}, body: ${errorText}`);
             } catch (error) {
-              // 如果直接调用失败（CORS 或其他错误），使用 CORS 代理
-              console.warn('⚠️ 直接调用出错，使用 CORS 代理...', error.message);
-              const proxyUrl = corsProxy(url);
-              console.log('🌐 使用 CORS 代理:', proxyUrl);
-              
-              // 对于 POST 请求，需要特殊处理 body
-              let proxyBody = options.body;
-              if (options.body && typeof options.body === 'string') {
-                try {
-                  // 如果 body 是 JSON 字符串，保持原样
-                  proxyBody = options.body;
-                } catch (e) {
-                  proxyBody = options.body;
-                }
-              }
-              
-              return fetch(proxyUrl, {
-                method: options.method || 'GET',
-                headers: {
-                  ...options.headers,
-                  'Content-Type': 'application/json'
-                },
-                body: proxyBody
-              });
+              console.error('❌ 直接调用出错:', error.message);
+              throw error;
             }
           };
 
