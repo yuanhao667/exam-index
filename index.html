@@ -789,8 +789,8 @@
                 fields: {
                   '姓名': user.name,
                   '组别': user.role === 'ui' ? 'UI' : '视觉',
-                  '# 得分': score,  // 注意：飞书表格中的字段名包含 "#" 前缀
-                  'A≡ 耗时': durationText,  // 注意：飞书表格中的字段名包含 "A≡" 前缀
+                  '得分': score,
+                  '耗时': durationText,
                   '作答日期': timestamp  // 使用完整时间戳（包含时分秒），便于按时间倒序排列
                 }
               };
