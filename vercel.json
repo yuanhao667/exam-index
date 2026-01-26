@@ -6,13 +6,8 @@
   },
   "rewrites": [
     {
-      "source": "/api/feishu",
-      "destination": "/api/feishu/index"
-    },
-    {
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }
-  ],
-  "cleanUrls": true
+  ]
 }
