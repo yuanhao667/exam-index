@@ -1,7 +1,4 @@
 {
-  "buildCommand": "",
-  "outputDirectory": ".",
-  "installCommand": "",
   "rewrites": [
     {
       "source": "/((?!api).*)",
