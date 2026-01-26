@@ -670,47 +670,53 @@
             return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
           };
 
-          // 直接调用飞书 API（带 CORS 代理）
+          // 直接调用飞书 API（带 CORS 代理后备方案）
           const callFeishuAPI = async (url, options = {}) => {
             try {
               // 先尝试直接调用
+              console.log('🌐 尝试直接调用飞书 API:', url);
               const directResponse = await fetch(url, {
-                ...options,
-                headers: {
-                  ...options.headers,
-                  'Content-Type': 'application/json'
-                }
-              });
-              
-              // 如果直接调用成功，返回结果
-              if (directResponse.ok) {
-                return directResponse;
-              }
-              
-              // 如果直接调用失败（可能是 CORS 问题），使用代理
-              console.warn('⚠️ 直接调用失败，尝试使用 CORS 代理...');
-              const proxyUrl = corsProxy(url);
-              const proxyResponse = await fetch(proxyUrl, {
                 method: options.method || 'GET',
                 headers: {
                   ...options.headers,
                   'Content-Type': 'application/json'
                 },
-                body: options.body ? JSON.stringify(JSON.parse(options.body)) : undefined
+                body: options.body
               });
               
-              return proxyResponse;
+              // 如果直接调用成功，返回结果
+              if (directResponse.ok) {
+                console.log('✅ 直接调用成功');
+                return directResponse;
+              }
+              
+              // 如果直接调用失败（可能是 CORS 问题），使用代理
+              console.warn('⚠️ 直接调用失败（状态码:', directResponse.status, '），尝试使用 CORS 代理...');
+              throw new Error('Direct call failed');
             } catch (error) {
-              // 如果直接调用失败，尝试使用 CORS 代理
-              console.warn('⚠️ 直接调用出错，尝试使用 CORS 代理...', error);
+              // 如果直接调用失败（CORS 或其他错误），使用 CORS 代理
+              console.warn('⚠️ 直接调用出错，使用 CORS 代理...', error.message);
               const proxyUrl = corsProxy(url);
+              console.log('🌐 使用 CORS 代理:', proxyUrl);
+              
+              // 对于 POST 请求，需要特殊处理 body
+              let proxyBody = options.body;
+              if (options.body && typeof options.body === 'string') {
+                try {
+                  // 如果 body 是 JSON 字符串，保持原样
+                  proxyBody = options.body;
+                } catch (e) {
+                  proxyBody = options.body;
+                }
+              }
+              
               return fetch(proxyUrl, {
                 method: options.method || 'GET',
                 headers: {
                   ...options.headers,
                   'Content-Type': 'application/json'
                 },
-                body: options.body ? JSON.stringify(JSON.parse(options.body)) : undefined
+                body: proxyBody
               });
             }
           };
