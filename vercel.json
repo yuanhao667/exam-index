@@ -4,7 +4,7 @@
   "installCommand": "",
   "functions": {
     "api/feishu/index.js": {
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs18"
     }
   },
   "rewrites": [
