@@ -2,11 +2,6 @@
   "buildCommand": "",
   "outputDirectory": ".",
   "installCommand": "",
-  "functions": {
-    "api/feishu/index.js": {
-      "runtime": "nodejs18"
-    }
-  },
   "rewrites": [
     {
       "source": "/((?!api).*)",
