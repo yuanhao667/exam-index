@@ -780,13 +780,18 @@
 
               // 4. 构建记录数据（根据飞书表格的实际字段名称）
               // 注意：字段名称必须与飞书表格中的列名完全一致
+              // 日期字段必须使用 Unix 时间戳（毫秒）
+              const now = new Date();
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const timestamp = today.getTime(); // Unix 时间戳（毫秒）
+              
               const recordData = {
                 fields: {
                   '姓名': user.name,
                   '组别': user.role === 'ui' ? 'UI' : '视觉',
-                  '得分': score,  // 表格中是 "得分"，不是 "# 得分"
-                  '耗时': durationText,  // 表格中是 "耗时"，不是 "A≡ 耗时" 或 "A= 耗时"
-                  '作答日期': new Date().toLocaleString('zh-CN').split(' ')[0].replace(/\//g, '/')  // 格式：2026/1/26
+                  '得分': score,
+                  '耗时': durationText,
+                  '作答日期': timestamp  // 飞书要求日期字段必须是 Unix 时间戳（毫秒）
                 }
               };
               
