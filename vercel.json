@@ -1,13 +1,16 @@
 {
-  "functions": {
-    "api/feishu.js": {
-      "runtime": "nodejs18.x"
-    },
-    "api/feishu/index.js": {
-      "runtime": "nodejs18.x"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
     }
-  },
-  "rewrites": [
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
     {
       "source": "/((?!api).*)",
       "destination": "/index.html"
