@@ -12,8 +12,8 @@
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- 外部题目文件（如果文件不存在会自动忽略，使用默认题目） -->
-    <script src="DEFAULT_QUESTIONS_ui.js" onerror="console.log('DEFAULT_QUESTIONS_ui.js 未找到，将使用默认题目')"></script>
-    <script src="DEFAULT_QUESTIONS_visual.js" onerror="console.log('DEFAULT_QUESTIONS_visual.js 未找到，将使用默认题目')"></script>
+    <script src="DEFAULT_QUESTIONS_ui.js" onerror="console.error('DEFAULT_QUESTIONS_ui.js 加载失败:', arguments[0])"></script>
+    <script src="DEFAULT_QUESTIONS_visual.js" onerror="console.error('DEFAULT_QUESTIONS_visual.js 加载失败:', arguments[0])"></script>
     <script>
       // 兼容旧格式：如果外部文件使用 const DEFAULT_QUESTIONS，自动转换
       // 初始化变量
@@ -39,6 +39,14 @@
       } catch (e) {
         // 如果 DEFAULT_QUESTIONS 不存在或无法访问，忽略
       }
+      
+      // 调试信息：检查题目是否加载成功
+      console.log('题目加载状态:', {
+        UI题目数量: window.DEFAULT_QUESTIONS_UI.length,
+        Visual题目数量: window.DEFAULT_QUESTIONS_VISUAL.length,
+        UI题目类型: Array.isArray(window.DEFAULT_QUESTIONS_UI) ? '数组' : typeof window.DEFAULT_QUESTIONS_UI,
+        Visual题目类型: Array.isArray(window.DEFAULT_QUESTIONS_VISUAL) ? '数组' : typeof window.DEFAULT_QUESTIONS_VISUAL
+      });
     </script>
     
     <style>
@@ -105,11 +113,18 @@
           let visualQuestions = [];
           
           // 新格式：window.DEFAULT_QUESTIONS_UI / window.DEFAULT_QUESTIONS_VISUAL
-          if (typeof window.DEFAULT_QUESTIONS_UI !== 'undefined') {
+          if (typeof window.DEFAULT_QUESTIONS_UI !== 'undefined' && Array.isArray(window.DEFAULT_QUESTIONS_UI)) {
             uiQuestions = window.DEFAULT_QUESTIONS_UI;
+            console.log('✅ UI题目加载成功，数量:', uiQuestions.length);
+          } else {
+            console.warn('⚠️ UI题目未加载，类型:', typeof window.DEFAULT_QUESTIONS_UI);
           }
-          if (typeof window.DEFAULT_QUESTIONS_VISUAL !== 'undefined') {
+          
+          if (typeof window.DEFAULT_QUESTIONS_VISUAL !== 'undefined' && Array.isArray(window.DEFAULT_QUESTIONS_VISUAL)) {
             visualQuestions = window.DEFAULT_QUESTIONS_VISUAL;
+            console.log('✅ Visual题目加载成功，数量:', visualQuestions.length);
+          } else {
+            console.warn('⚠️ Visual题目未加载，类型:', typeof window.DEFAULT_QUESTIONS_VISUAL);
           }
           
           // 旧格式兼容：如果存在全局 DEFAULT_QUESTIONS，按role分类
@@ -117,10 +132,12 @@
             const allQuestions = window.DEFAULT_QUESTIONS;
             uiQuestions = allQuestions.filter(q => q.role === 'ui');
             visualQuestions = allQuestions.filter(q => q.role === 'visual');
+            console.log('✅ 从旧格式加载题目，UI:', uiQuestions.length, 'Visual:', visualQuestions.length);
           }
           
           // 如果都没有，使用内置默认值
           if (uiQuestions.length === 0 && visualQuestions.length === 0) {
+            console.error('❌ 没有找到任何题目，使用默认占位题目');
             return {
               ui: [{
                 id: 'demo-ui-1', role: 'ui', dimension: '维度 1：习惯用 AI 解决问题的程度',
@@ -141,6 +158,7 @@
             };
           }
           
+          console.log('📚 最终题目数量 - UI:', uiQuestions.length, 'Visual:', visualQuestions.length);
           return {
             ui: uiQuestions,
             visual: visualQuestions
