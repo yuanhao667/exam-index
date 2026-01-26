@@ -19,7 +19,11 @@ module.exports = async (req, res) => {
   const { action, ...params } = req.body;
 
   try {
-    // 从环境变量读取飞书配置
+    // 从 Vercel 环境变量读取飞书配置
+    // 这些环境变量需要在 Vercel 项目设置中配置：
+    // - FEISHU_APP_ID
+    // - FEISHU_APP_SECRET
+    // - FEISHU_APP_TOKEN
     const FEISHU_CONFIG = {
       appId: process.env.FEISHU_APP_ID,
       appSecret: process.env.FEISHU_APP_SECRET,
@@ -28,14 +32,20 @@ module.exports = async (req, res) => {
 
     // 验证必需的配置项
     if (!FEISHU_CONFIG.appId || !FEISHU_CONFIG.appSecret || !FEISHU_CONFIG.appToken) {
-      console.error('❌ 飞书配置缺失:', {
+      console.error('❌ 飞书配置缺失 - 请检查 Vercel 环境变量设置:', {
         hasAppId: !!FEISHU_CONFIG.appId,
         hasAppSecret: !!FEISHU_CONFIG.appSecret,
-        hasAppToken: !!FEISHU_CONFIG.appToken
+        hasAppToken: !!FEISHU_CONFIG.appToken,
+        envKeys: Object.keys(process.env).filter(key => key.startsWith('FEISHU_'))
       });
       return res.status(500).json({ 
-        error: '飞书配置未设置，请在管理员页面配置环境变量',
-        code: 'CONFIG_MISSING'
+        error: '飞书配置未设置，请在 Vercel 项目设置中配置环境变量',
+        code: 'CONFIG_MISSING',
+        missing: {
+          FEISHU_APP_ID: !FEISHU_CONFIG.appId,
+          FEISHU_APP_SECRET: !FEISHU_CONFIG.appSecret,
+          FEISHU_APP_TOKEN: !FEISHU_CONFIG.appToken
+        }
       });
     }
 
