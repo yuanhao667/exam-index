@@ -1,16 +1,11 @@
 {
-  "functions": {
-    "api/feishu.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*\\.(js|css|html|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot))",
       "destination": "/$1"
     },
     {
-      "source": "/((?!api).*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
