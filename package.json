@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "洋葱学园 UED AI 技能考核系统",
   "engines": {
-    "node": ">=18.x"
+    "node": "20.x"
   }
 }
