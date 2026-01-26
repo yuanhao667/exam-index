@@ -1,4 +1,7 @@
 {
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "installCommand": "",
   "functions": {
     "api/feishu/index.js": {
       "runtime": "nodejs18.x"
@@ -9,6 +12,5 @@
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }
-  ],
-  "cleanUrls": true
+  ]
 }

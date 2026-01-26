@@ -1,8 +1,5 @@
 {
   "name": "exam-index",
   "version": "1.0.0",
-  "description": "洋葱学园 UED AI 技能考核系统",
-  "scripts": {
-    "build": "echo 'No build step required for static site'"
-  }
+  "description": "洋葱学园 UED AI 技能考核系统"
 }
