@@ -778,17 +778,15 @@
               const durationSeconds = durationMs ? Math.floor((durationMs % 60000) / 1000) : 0;
               const durationText = `${durationMinutes}分${durationSeconds}秒`;
 
-              // 4. 构建记录数据（根据飞书表格的字段结构）
+              // 4. 构建记录数据（根据飞书表格的实际字段名称）
+              // 注意：字段名称必须与飞书表格中的列名完全一致
               const recordData = {
                 fields: {
                   '姓名': user.name,
-                  '角色': user.role === 'ui' ? 'UI组' : '视觉组',
-                  '得分': score,
-                  '总分': quizQuestions.reduce((sum, q) => sum + (q.type === 'single' ? 2 : 3), 0),
-                  '正确率': `${correctRate}%`,
-                  '用时': durationText,
-                  '完成时间': new Date().toLocaleString('zh-CN'),
-                  '答题详情': JSON.stringify(answerDetails, null, 2)
+                  '组别': user.role === 'ui' ? 'UI' : '视觉',  // 根据表格显示，应该是 'UI' 或 '视觉'
+                  '# 得分': score,  // 根据表格显示，字段名是 '# 得分'
+                  'A≡ 耗时': durationText,  // 根据表格显示，字段名是 'A≡ 耗时'
+                  '作答日期': new Date().toLocaleString('zh-CN').split(' ')[0]  // 只取日期部分
                 }
               };
               
