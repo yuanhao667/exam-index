@@ -95,7 +95,7 @@
         // --- 应用逻辑 ---
 
         const LOGO_URL = "https://img.icons8.com/color/480/onion.png";
-        const ADMIN_NAMES = ["赵雷"]; 
+        const ADMIN_NAMES = ["OnionLight123"]; 
         const STORAGE_KEY = "onion_assessment_questions_v3";
 
         // 从外部文件加载题目，如果文件不存在则使用默认值
@@ -382,6 +382,7 @@
           const [quizEndTime, setQuizEndTime] = useState(null);
           const [questionStartTime, setQuestionStartTime] = useState(null);
           const [questionDurations, setQuestionDurations] = useState({});
+          const [hasAutoSaved, setHasAutoSaved] = useState(false);
           
           const previewRef = useRef(null);
 
@@ -432,6 +433,7 @@
               setQuizEndTime(null);
               setQuestionStartTime(Date.now());
               setQuestionDurations({});
+              setHasAutoSaved(false);
             }
           };
 
@@ -579,6 +581,18 @@
             }
           }, [page, quizStartTime, quizEndTime]);
 
+          // 自动保存到飞书（进入result页面时，只保存一次）
+          useEffect(() => {
+            if (page === 'result' && quizStartTime && quizEndTime && !hasAutoSaved) {
+              setHasAutoSaved(true);
+              const autoSave = async () => {
+                const { score } = calculateScore();
+                await saveToFeishu(score);
+              };
+              autoSave();
+            }
+          }, [page, quizStartTime, quizEndTime, hasAutoSaved]);
+
           // Modified calculateScore to correctly track max possible scores
           const calculateScore = () => {
             let score = 0;
@@ -625,56 +639,79 @@
             return { score, maxScore: totalMaxScore, dimensionScores, dimensionMaxScores };
           };
 
-          // 飞书 API 配置
+          // 飞书 API 配置（通过代理）
           const FEISHU_CONFIG = {
-            appId: 'cli_a9f9f58238381bde',
-            appSecret: '4d9U9oZgDtoL7PgSHZltgdx13NP8WDVE',
             appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
           };
 
-          // 获取飞书 access_token
+          // 获取代理API地址（自动检测）
+          const getProxyUrl = () => {
+            // 如果是开发环境，使用相对路径；生产环境会自动使用正确的域名
+            return '/api/feishu';
+          };
+
+          // 获取飞书 access_token（通过代理）
           const getFeishuAccessToken = async () => {
             try {
-              const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+              const response = await fetch(getProxyUrl(), {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  app_id: FEISHU_CONFIG.appId,
-                  app_secret: FEISHU_CONFIG.appSecret
+                  action: 'getToken'
                 })
               });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
               const data = await response.json();
               if (data.code === 0) {
                 return data.tenant_access_token;
               } else {
-                throw new Error(data.msg || '获取 access_token 失败');
+                throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
               }
             } catch (error) {
               console.error('获取 access_token 错误:', error);
+              // 如果是网络错误，提供更友好的提示
+              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error('网络连接失败，请检查网络或联系管理员');
+              }
               throw error;
             }
           };
 
-          // 获取表格列表
+          // 获取表格列表（通过代理）
           const getFeishuTables = async (accessToken) => {
             try {
-              const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables`, {
-                method: 'GET',
+              const response = await fetch(getProxyUrl(), {
+                method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`,
                   'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({
+                  action: 'getTables',
+                  accessToken: accessToken
+                })
               });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
               const data = await response.json();
               if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
                 return data.data.items[0].table_id; // 返回第一个表格的 table_id
               } else {
-                throw new Error(data.msg || '获取表格列表失败');
+                throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
               }
             } catch (error) {
               console.error('获取表格列表错误:', error);
+              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error('网络连接失败，请检查网络或联系管理员');
+              }
               throw error;
             }
           };
@@ -731,15 +768,25 @@
                 }
               };
 
-              // 5. 写入数据到飞书表格
-              const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`, {
+              // 5. 写入数据到飞书表格（通过代理）
+              const response = await fetch(getProxyUrl(), {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${accessToken}`,
                   'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(recordData)
+                body: JSON.stringify({
+                  action: 'saveRecord',
+                  accessToken: accessToken,
+                  tableId: tableId,
+                  recordData: recordData
+                })
               });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('HTTP错误响应:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
 
               const result = await response.json();
               
@@ -747,11 +794,18 @@
                 showToast(`数据已成功保存到飞书！得分：${score}`, 'success');
                 return true;
               } else {
-                throw new Error(result.msg || '保存数据失败');
+                throw new Error(result.msg || `保存数据失败: code=${result.code}`);
               }
             } catch (error) {
               console.error('保存到飞书错误:', error);
-              showToast(`保存失败：${error.message}`, 'error');
+              // 提供更详细的错误信息
+              let errorMessage = error.message;
+              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('CORS')) {
+                errorMessage = '网络连接失败或跨域问题，请联系管理员检查配置';
+              } else if (error.message.includes('HTTP error')) {
+                errorMessage = `服务器错误: ${error.message}`;
+              }
+              showToast(`保存失败：${errorMessage}`, 'error');
               return false;
             }
           };
@@ -800,20 +854,10 @@
             document.body.removeChild(link);
           };
 
+          // handleFinish 函数已不再需要，因为改为自动保存
+          // 保留函数以防其他地方调用，但不再执行任何操作
           const handleFinish = async () => {
-            const { score } = calculateScore();
-            const success = await saveToFeishu(score);
-            if (success) {
-              setTimeout(() => {
-                setUser({ name: '', role: '', isAdmin: false });
-                setAnswers({});
-                setPage('login');
-                setQuizStartTime(null);
-                setQuizEndTime(null);
-                setQuestionStartTime(null);
-                setQuestionDurations({});
-              }, 2000);
-            }
+            // 已改为自动保存，此函数保留为空
           };
 
         const formatDuration = (ms) => {
@@ -863,7 +907,7 @@
                       </g>
                     </svg>
                   </div>
-                  <h1 className="text-2xl font-black text-[#4b4b4b] mt-4">洋葱学园 UED<br/>AI 技能考核 <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded">Local v7.0</span></h1>
+                  <h1 className="text-2xl font-black text-[#4b4b4b] mt-4">洋葱学园 UED<br/>AI 技能考核 <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded">v7.0</span></h1>
                 </div>
                 <div className="w-full space-y-4"> 
                   <input 
@@ -1185,9 +1229,8 @@
                 </div>
                 
                 <div className="w-full border-t border-[#e5e5e5] bg-white">
-                  <div className="max-w-2xl mx-auto p-6 flex gap-3">
-                    <DuoButton variant="secondary" fullWidth onClick={() => setPage('review')}><Icons.Eye size={20} /> 查看解析</DuoButton>
-                    <DuoButton variant="primary" fullWidth onClick={handleFinish}><Icons.Save size={20} /> 保存</DuoButton>
+                  <div className="max-w-2xl mx-auto p-6">
+                    <DuoButton variant="primary" fullWidth onClick={() => setPage('review')}><Icons.Eye size={20} /> 查看解析</DuoButton>
                   </div>
                 </div>
               </div>
