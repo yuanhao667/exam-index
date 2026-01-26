@@ -793,8 +793,7 @@
               };
               
               console.log('📝 步骤3: 准备保存的数据:', JSON.stringify(recordData, null, 2));
-              console.log('📝 步骤3: 使用的字段名:', Object.keys(recordData.fields));
-              
+
               // 5. 写入数据到飞书表格（通过代理）
               console.log('📝 步骤4: 发送保存请求...');
               const response = await fetch(getProxyUrl(), {
