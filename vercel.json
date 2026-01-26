@@ -2,14 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/feishu.js",
+      "src": "api/**/*.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/feishu",
-      "dest": "/api/feishu.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     },
     {
       "source": "/((?!api).*)",
