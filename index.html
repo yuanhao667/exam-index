@@ -40,13 +40,6 @@
         // 如果 DEFAULT_QUESTIONS 不存在或无法访问，忽略
       }
       
-      // 调试信息：检查题目是否加载成功
-      console.log('题目加载状态:', {
-        UI题目数量: window.DEFAULT_QUESTIONS_UI.length,
-        Visual题目数量: window.DEFAULT_QUESTIONS_VISUAL.length,
-        UI题目类型: Array.isArray(window.DEFAULT_QUESTIONS_UI) ? '数组' : typeof window.DEFAULT_QUESTIONS_UI,
-        Visual题目类型: Array.isArray(window.DEFAULT_QUESTIONS_VISUAL) ? '数组' : typeof window.DEFAULT_QUESTIONS_VISUAL
-      });
     </script>
     
     <style>
@@ -115,16 +108,10 @@
           // 新格式：window.DEFAULT_QUESTIONS_UI / window.DEFAULT_QUESTIONS_VISUAL
           if (typeof window.DEFAULT_QUESTIONS_UI !== 'undefined' && Array.isArray(window.DEFAULT_QUESTIONS_UI)) {
             uiQuestions = window.DEFAULT_QUESTIONS_UI;
-            console.log('✅ UI题目加载成功，数量:', uiQuestions.length);
-          } else {
-            console.warn('⚠️ UI题目未加载，类型:', typeof window.DEFAULT_QUESTIONS_UI);
           }
           
           if (typeof window.DEFAULT_QUESTIONS_VISUAL !== 'undefined' && Array.isArray(window.DEFAULT_QUESTIONS_VISUAL)) {
             visualQuestions = window.DEFAULT_QUESTIONS_VISUAL;
-            console.log('✅ Visual题目加载成功，数量:', visualQuestions.length);
-          } else {
-            console.warn('⚠️ Visual题目未加载，类型:', typeof window.DEFAULT_QUESTIONS_VISUAL);
           }
           
           // 旧格式兼容：如果存在全局 DEFAULT_QUESTIONS，按role分类
@@ -132,12 +119,10 @@
             const allQuestions = window.DEFAULT_QUESTIONS;
             uiQuestions = allQuestions.filter(q => q.role === 'ui');
             visualQuestions = allQuestions.filter(q => q.role === 'visual');
-            console.log('✅ 从旧格式加载题目，UI:', uiQuestions.length, 'Visual:', visualQuestions.length);
           }
           
           // 如果都没有，使用内置默认值
           if (uiQuestions.length === 0 && visualQuestions.length === 0) {
-            console.error('❌ 没有找到任何题目，使用默认占位题目');
             return {
               ui: [{
                 id: 'demo-ui-1', role: 'ui', dimension: '维度 1：习惯用 AI 解决问题的程度',
@@ -158,7 +143,6 @@
             };
           }
           
-          console.log('📚 最终题目数量 - UI:', uiQuestions.length, 'Visual:', visualQuestions.length);
           return {
             ui: uiQuestions,
             visual: visualQuestions
@@ -471,7 +455,6 @@
                 previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }, 100);
             } catch (e) {
-              console.error(e);
               showToast("解析出错，请检查文本", "error");
             }
           };
@@ -696,7 +679,6 @@
                 throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
               }
             } catch (error) {
-              console.error('获取 access_token 错误:', error);
               if (error.message.includes('Failed to fetch')) {
                 throw new Error('无法连接到代理服务器。请确保已运行本地代理服务器：node proxy-server.js');
               }
@@ -729,7 +711,6 @@
                 throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
               }
             } catch (error) {
-              console.error('获取表格列表错误:', error);
               throw error;
             }
           };
@@ -738,17 +719,12 @@
           const saveToFeishu = async (score) => {
             try {
               showToast('正在保存数据到飞书...', 'info');
-              console.log('🚀 开始保存到飞书（直接从浏览器调用）...');
               
               // 1. 获取 access_token
-              console.log('📝 步骤1: 获取 access_token...');
               const accessToken = await getFeishuAccessToken();
-              console.log('✅ access_token 获取成功');
               
               // 2. 获取表格 ID
-              console.log('📝 步骤2: 获取表格 ID...');
               const tableId = await getFeishuTables(accessToken);
-              console.log('✅ 表格 ID:', tableId);
               
               // 3. 准备数据
               const total = quizQuestions.length || 1;
@@ -791,11 +767,8 @@
                   '作答日期': new Date().toLocaleString('zh-CN').split(' ')[0].replace(/\//g, '/')  // 格式：2026/1/26
                 }
               };
-              
-              console.log('📝 步骤3: 准备保存的数据:', JSON.stringify(recordData, null, 2));
 
               // 5. 写入数据到飞书表格（通过代理）
-              console.log('📝 步骤4: 发送保存请求...');
               const response = await fetch(getProxyUrl(), {
                 method: 'POST',
                 headers: {
@@ -809,28 +782,20 @@
                 })
               });
 
-              console.log('📡 响应状态:', response.status, response.statusText);
-              
               if (!response.ok) {
                 const errorText = await response.text();
-                console.error('❌ HTTP错误响应:', errorText);
                 throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
               }
 
               const result = await response.json();
-              console.log('📦 飞书API响应:', result);
               
               if (result.code === 0) {
-                console.log('✅ 保存成功！');
                 showToast(`数据已成功保存到飞书！得分：${score}`, 'success');
                 return true;
               } else {
-                console.error('❌ 飞书API返回错误:', result);
                 throw new Error(result.msg || `保存数据失败: code=${result.code}`);
               }
             } catch (error) {
-              console.error('❌ 保存到飞书错误:', error);
-              console.error('错误堆栈:', error.stack);
               // 提供更详细的错误信息
               let errorMessage = error.message;
               if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
@@ -889,11 +854,6 @@
             document.body.removeChild(link);
           };
 
-          // handleFinish 函数已不再需要，因为改为自动保存
-          // 保留函数以防其他地方调用，但不再执行任何操作
-          const handleFinish = async () => {
-            // 已改为自动保存，此函数保留为空
-          };
 
         const formatDuration = (ms) => {
           if (!ms || ms < 0) return <span>0<span className="text-lg ml-0.5">s</span></span>;
@@ -1076,19 +1036,61 @@
                       {currentRoleQuestions.length === 0 ? (
                           <div className="text-center py-8 text-gray-400 text-sm">暂无题目，请在上分录入并解析保存</div>
                       ) : (
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                               {currentRoleQuestions.map((q, idx) => (
-                                <div key={q.id} className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm flex justify-between items-start group hover:border-red-200 transition-colors">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`w-2 h-2 rounded-full ${q.type === 'single' ? 'bg-[#7A64FF]' : 'bg-[#FF965E]'}`}></span>
-                                            <span className="text-gray-900 font-bold line-clamp-1">{idx + 1}. {q.question}</span>
+                                <div key={q.id} className="bg-white border-2 border-gray-200 rounded-xl p-4 group hover:border-red-300 transition-colors">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-3 flex-wrap">
+                                                {q.type && (
+                                                    <div className={`inline-block px-3 py-1 ${q.type === 'single' ? 'bg-[#7A64FF]' : 'bg-[#FF965E]'} text-white rounded-lg text-xs font-extrabold uppercase`}>
+                                                        {q.type === 'single' ? '单选题' : '多选题'}
+                                                    </div>
+                                                )}
+                                                <div className="inline-block px-3 py-1 bg-[#ff9600]/10 text-[#ff9600] rounded-lg text-xs font-extrabold uppercase">{q.dimension || '通用维度'}</div>
+                                            </div>
+                                            <div className="text-gray-900 font-bold text-base mb-3">
+                                                {idx + 1}. {q.question}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-gray-400 pl-4">{q.dimension}</div>
+                                        <button onClick={() => handleDeleteQuestion(q.id)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
+                                            <Icons.Trash2 size={18} />
+                                        </button>
                                     </div>
-                                    <button onClick={() => handleDeleteQuestion(q.id)} className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Icons.Trash2 size={16} />
-                                    </button>
+                                    
+                                    {/* 选项 */}
+                                    {q.options && q.options.length > 0 && (
+                                        <div className="space-y-2 mb-3 pl-4">
+                                            {q.options.map((opt, optIdx) => {
+                                                return (
+                                                    <div key={opt.id || optIdx} className="flex items-start gap-2 text-sm text-gray-700">
+                                                        <span className="font-bold text-gray-500">{opt.id}.</span>
+                                                        <span>{opt.text}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    
+                                    {/* 正确答案 */}
+                                    {q.correct && q.correct.length > 0 && (
+                                        <div className="pl-4" style={{ marginBottom: '4px' }}>
+                                            <div className="text-xs font-bold text-gray-500" style={{ marginBottom: '2px' }}>正确答案：</div>
+                                            <div className="text-sm font-bold text-[#58cc02]">
+                                                {q.correct.join('、')}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {/* 解析 */}
+                                    {q.explanation && (
+                                        <div className="pl-4 border-t border-gray-100" style={{ paddingTop: '10px', paddingBottom: '4px' }}>
+                                            <div className="text-xs font-bold text-gray-500" style={{ marginBottom: '0px', lineHeight: '1.2' }}>解析：</div>
+                                            <div className="text-sm text-gray-700 whitespace-pre-wrap" style={{ lineHeight: '1.4', marginTop: '0px' }}>
+                                                {q.explanation}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                               ))}
                           </div>
