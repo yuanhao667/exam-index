@@ -657,80 +657,85 @@
             return { score, maxScore: totalMaxScore, dimensionScores, dimensionMaxScores };
           };
 
-          // 飞书 API 配置（通过代理）
+          // 飞书 API 配置（直接从浏览器调用，使用 CORS 代理）
           const FEISHU_CONFIG = {
+            appId: 'cli_a9f9f58238381bde',
+            appSecret: '4d9U9oZgDtoL7PgSHZltgdx13NP8WDVE',
             appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
           };
 
-          // 获取代理API地址（自动检测）
-          const getProxyUrl = () => {
-            // 如果是开发环境，使用相对路径；生产环境会自动使用正确的域名
-            return '/api/feishu';
+          // 使用 CORS 代理服务（绕过浏览器 CORS 限制）
+          const corsProxy = (url) => {
+            // 方案1：使用 allorigins（推荐，稳定）
+            return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+            // 备选方案（如果上面失败）：
+            // return `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            // return `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+          };
+          
+          // 直接调用飞书 API（如果支持 CORS）
+          const callFeishuAPI = async (url, options) => {
+            // 先尝试直接调用（飞书 API 可能支持 CORS）
+            try {
+              const response = await fetch(url, options);
+              if (response.ok) {
+                return response;
+              }
+            } catch (directError) {
+              console.log('直接调用失败，使用 CORS 代理...', directError);
+            }
+            
+            // 如果直接调用失败，使用 CORS 代理
+            const proxyUrl = corsProxy(url);
+            return await fetch(proxyUrl, options);
           };
 
-          // 获取飞书 access_token（通过代理）
+          // 获取飞书 access_token（直接从浏览器调用）
           const getFeishuAccessToken = async () => {
-            try {
-              const response = await fetch(getProxyUrl(), {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  action: 'getToken'
-                })
-              });
-              
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              
-              const data = await response.json();
-              if (data.code === 0) {
-                return data.tenant_access_token;
-              } else {
-                throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
-              }
-            } catch (error) {
-              console.error('获取 access_token 错误:', error);
-              // 如果是网络错误，提供更友好的提示
-              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                throw new Error('网络连接失败，请检查网络或联系管理员');
-              }
-              throw error;
+            const url = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
+            const response = await callFeishuAPI(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                app_id: FEISHU_CONFIG.appId,
+                app_secret: FEISHU_CONFIG.appSecret
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.code === 0) {
+              return data.tenant_access_token;
+            } else {
+              throw new Error(data.msg || `获取 access_token 失败: code=${data.code}`);
             }
           };
 
-          // 获取表格列表（通过代理）
+          // 获取表格列表（直接从浏览器调用）
           const getFeishuTables = async (accessToken) => {
-            try {
-              const response = await fetch(getProxyUrl(), {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  action: 'getTables',
-                  accessToken: accessToken
-                })
-              });
-              
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables`;
+            const response = await callFeishuAPI(url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
               }
-              
-              const data = await response.json();
-              if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
-                return data.data.items[0].table_id; // 返回第一个表格的 table_id
-              } else {
-                throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
-              }
-            } catch (error) {
-              console.error('获取表格列表错误:', error);
-              if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                throw new Error('网络连接失败，请检查网络或联系管理员');
-              }
-              throw error;
+            });
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
+              return data.data.items[0].table_id; // 返回第一个表格的 table_id
+            } else {
+              throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
             }
           };
 
@@ -786,18 +791,15 @@
                 }
               };
 
-              // 5. 写入数据到飞书表格（通过代理）
-              const response = await fetch(getProxyUrl(), {
+              // 5. 写入数据到飞书表格（直接从浏览器调用）
+              const url = `https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`;
+              const response = await callFeishuAPI(url, {
                 method: 'POST',
                 headers: {
+                  'Authorization': `Bearer ${accessToken}`,
                   'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                  action: 'saveRecord',
-                  accessToken: accessToken,
-                  tableId: tableId,
-                  recordData: recordData
-                })
+                body: JSON.stringify(recordData)
               });
 
               if (!response.ok) {
