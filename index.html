@@ -594,16 +594,33 @@
             }
           }, [page, quizStartTime, quizEndTime, hasAutoSaved]);
 
+          // Normalize dimension name: only use first 3 characters for matching
+          // This ensures dimensions with same prefix (e.g., "维度一") are treated as the same
+          const normalizeDimensionKey = (dimension) => {
+            if (!dimension || dimension === '通用维度') return '通用维度';
+            // Only take first 3 characters (e.g., "维度一", "维度二")
+            return dimension.substring(0, 3);
+          };
+
           // Modified calculateScore to correctly track max possible scores
           const calculateScore = () => {
             let score = 0;
             let totalMaxScore = 0;
             const dimensionScores = {};
             const dimensionMaxScores = {};
+            // Store original dimension names for display
+            const dimensionNames = {};
 
             // 1. Initialize data structures based on ALL quiz questions
             quizQuestions.forEach(q => {
-              const dimKey = q.dimension || '通用维度';
+              const originalDim = q.dimension || '通用维度';
+              const dimKey = normalizeDimensionKey(originalDim);
+              
+              // Store the first original dimension name we encounter for this key
+              if (!dimensionNames[dimKey]) {
+                dimensionNames[dimKey] = originalDim;
+              }
+              
               if (dimensionScores[dimKey] === undefined) {
                   dimensionScores[dimKey] = 0;
                   dimensionMaxScores[dimKey] = 0;
@@ -622,7 +639,8 @@
               const isSingle = q.type === 'single';
               const points = isSingle ? 2 : 3;
               
-              const dimKey = q.dimension || '通用维度';
+              const originalDim = q.dimension || '通用维度';
+              const dimKey = normalizeDimensionKey(originalDim);
               
               let qScore = 0;
               // Strict matching: no wrong answers, and no missing correct answers
@@ -637,7 +655,16 @@
               dimensionScores[dimKey] += qScore;
             });
             
-            return { score, maxScore: totalMaxScore, dimensionScores, dimensionMaxScores };
+            // Convert dimensionScores and dimensionMaxScores to use original names for display
+            const displayDimensionScores = {};
+            const displayDimensionMaxScores = {};
+            Object.keys(dimensionScores).forEach(key => {
+              const displayName = dimensionNames[key] || key;
+              displayDimensionScores[displayName] = dimensionScores[key];
+              displayDimensionMaxScores[displayName] = dimensionMaxScores[key];
+            });
+            
+            return { score, maxScore: totalMaxScore, dimensionScores: displayDimensionScores, dimensionMaxScores: displayDimensionMaxScores };
           };
 
           // 飞书 API 配置（通过本地代理服务器或 Vercel Functions）
@@ -1144,7 +1171,7 @@
             if (!q) return <div>Loading...</div>;
             const isFirst = currentQuestionIndex === 0;
             const isLast = currentQuestionIndex === quizQuestions.length - 1;
-            const dimensionQuestions = quizQuestions.filter(i => i.dimension === q.dimension);
+            const dimensionQuestions = quizQuestions.filter(i => normalizeDimensionKey(i.dimension) === normalizeDimensionKey(q.dimension));
             const currentInDim = dimensionQuestions.findIndex(i => i.id === q.id) + 1;
             const currentHasAnswer = answers[q.id] && answers[q.id].length > 0;
 
