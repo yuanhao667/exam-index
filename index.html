@@ -53,6 +53,16 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes heartScale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+        .animate-heart-scale { animation: heartScale 0.3s ease-out; }
+        @keyframes tooltipBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-tooltip-bounce { animation: tooltipBounce 1.5s ease-in-out infinite; }
         
         /* 优化滚动条样式 */
         ::-webkit-scrollbar { width: 8px; }
@@ -90,7 +100,16 @@
             Trophy: (props) => <Icon {...props} path={<><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></>} />,
             AlertCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>} />,
             XCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></>} />,
-            Database: (props) => <Icon {...props} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>} />
+            Database: (props) => <Icon {...props} path={<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>} />,
+            Heart: (props) => {
+                const { filled = false, size = 24, color = "currentColor", className = "" } = props;
+                const heartColor = filled ? "#FF4DD0" : color;
+                return (
+                    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={filled ? heartColor : "none"} stroke={filled ? heartColor : color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                );
+            }
         };
 
         // --- 应用逻辑 ---
@@ -385,6 +404,9 @@
           const [questionStartTime, setQuestionStartTime] = useState(null);
           const [questionDurations, setQuestionDurations] = useState({});
           const [hasAutoSaved, setHasAutoSaved] = useState(false);
+          const [likedQuestions, setLikedQuestions] = useState(new Set()); // 点赞的题号集合
+          const [showTooltip, setShowTooltip] = useState(false); // 是否显示引导气泡
+          const [heartAnimating, setHeartAnimating] = useState(false); // 爱心动画状态
           
           const previewRef = useRef(null);
 
@@ -436,6 +458,8 @@
               setQuestionStartTime(Date.now());
               setQuestionDurations({});
               setHasAutoSaved(false);
+              setLikedQuestions(new Set());
+              setShowTooltip(true); // 第一题显示引导气泡
             }
           };
 
@@ -593,6 +617,16 @@
               autoSave();
             }
           }, [page, quizStartTime, quizEndTime, hasAutoSaved]);
+
+          // 第一题显示引导气泡，3.5秒后自动消失
+          useEffect(() => {
+            if (page === 'quiz' && currentQuestionIndex === 0 && showTooltip) {
+              const timer = setTimeout(() => {
+                setShowTooltip(false);
+              }, 3500);
+              return () => clearTimeout(timer);
+            }
+          }, [page, currentQuestionIndex, showTooltip]);
 
           // Normalize dimension name: only use first 3 characters for matching
           // This ensures dimensions with same prefix (e.g., "维度一") are treated as the same
@@ -783,15 +817,20 @@
               // 4. 构建记录数据（根据飞书表格的实际字段名称）
               // 注意：字段名称必须与飞书表格中的列名完全一致
               // 使用成功版本（"斤斤计较"成功保存）的字段匹配规则：
-              // - '姓名'、'组别'、'得分'、'耗时'、'作答日期'
+              // - '姓名'、'组别'、'得分'、'耗时'、'作答日期'、'点赞题号'
               // - 日期字段使用毫秒时间戳（飞书推荐格式）
+              // - 点赞题号：将点赞的题号数组转换为字符串，如 "1，6，7，15"
+              const likedQuestionNumbers = Array.from(likedQuestions).sort((a, b) => a - b);
+              const likedQuestionText = likedQuestionNumbers.length > 0 ? likedQuestionNumbers.join('，') : '';
+              
               const recordData = {
                 fields: {
                   '姓名': user.name,
                   '组别': user.role === 'ui' ? 'UI' : '视觉',
                   '得分': score,  // 表格中是 "得分"，不是 "# 得分"
                   '耗时': durationText,  // 表格中是 "耗时"，不是 "A≡ 耗时" 或 "A= 耗时"
-                  '作答日期': Date.now()  // 毫秒时间戳（飞书推荐格式）
+                  '作答日期': Date.now(),  // 毫秒时间戳（飞书推荐格式）
+                  '点赞题号': likedQuestionText  // 点赞题号，格式如 "1，6，7，15"
                 }
               };
 
@@ -1152,6 +1191,8 @@
             commitCurrentQuestionTime();
             setCurrentQuestionIndex(prev => prev - 1);
             setQuestionStartTime(Date.now());
+            // 切换题目时隐藏引导气泡
+            setShowTooltip(false);
           };
 
           const goNextQuestion = (isLast) => {
@@ -1163,7 +1204,24 @@
             } else {
               setCurrentQuestionIndex(prev => prev + 1);
               setQuestionStartTime(Date.now());
+              // 切换题目时隐藏引导气泡
+              setShowTooltip(false);
             }
+          };
+
+          const handleLikeToggle = (questionIndex) => {
+            setHeartAnimating(true);
+            setTimeout(() => setHeartAnimating(false), 300);
+            
+            setLikedQuestions(prev => {
+              const newSet = new Set(prev);
+              if (newSet.has(questionIndex + 1)) {
+                newSet.delete(questionIndex + 1);
+              } else {
+                newSet.add(questionIndex + 1);
+              }
+              return newSet;
+            });
           };
 
           const renderQuiz = () => {
@@ -1174,6 +1232,7 @@
             const dimensionQuestions = quizQuestions.filter(i => normalizeDimensionKey(i.dimension) === normalizeDimensionKey(q.dimension));
             const currentInDim = dimensionQuestions.findIndex(i => i.id === q.id) + 1;
             const currentHasAnswer = answers[q.id] && answers[q.id].length > 0;
+            const isLiked = likedQuestions.has(currentQuestionIndex + 1);
 
             return (
               <div className="flex flex-col h-screen w-full bg-white">
@@ -1205,8 +1264,37 @@
                 </div>
 
                 {/* Footer: Full Width */}
-                <div className="w-full border-t border-[#e5e5e5] bg-white">
-                  <div className="max-w-2xl mx-auto p-6 flex gap-3">
+                <div className="w-full border-t border-[#e5e5e5] bg-white relative overflow-visible">
+                  <div className="max-w-2xl mx-auto p-6 flex gap-3 items-center relative overflow-visible">
+                    {/* 点赞按钮 */}
+                    <div className="relative flex-shrink-0 self-stretch">
+                      <button
+                        onClick={() => handleLikeToggle(currentQuestionIndex)}
+                        className="font-bold h-full py-3 px-7 rounded-2xl transition-all duration-100 bg-white hover:bg-gray-50 text-[#393548] border-2 border-[#e5e5e5] border-b-4 active:border-b-0 active:translate-y-1 flex justify-center items-center"
+                      >
+                        <Icons.Heart 
+                          filled={isLiked} 
+                          size={20} 
+                          color={isLiked ? "#FF4DD0" : "#57526C"}
+                          className={heartAnimating ? "animate-heart-scale" : ""}
+                        />
+                      </button>
+                      {/* 引导气泡 - 只在第一题显示 */}
+                      {isFirst && showTooltip && (
+                        <>
+                          {/* 圆角矩形 - 与点赞按钮左对齐，与三角间距 -3 */}
+                          <div className="absolute left-0 animate-tooltip-bounce z-10" style={{ bottom: 'calc(100% + 14px + 10px - 3px)' }}>
+                            <div className="bg-[#57526C] text-white px-5 py-3 rounded-lg font-medium whitespace-nowrap" style={{ fontSize: '16px' }}>
+                              这题咋样？你说了算～
+                            </div>
+                          </div>
+                          {/* 三角 - 与点赞按钮左右中对齐，距按钮顶 14px */}
+                          <div className="absolute animate-tooltip-bounce z-10" style={{ bottom: 'calc(100% + 14px)', left: '50%', width: 20, marginLeft: -10 }}>
+                            <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-[#57526C]"></div>
+                          </div>
+                        </>
+                      )}
+                    </div>
                     <DuoButton variant="secondary" fullWidth disabled={isFirst} onClick={goPrevQuestion}>上一题</DuoButton>
                     <DuoButton variant="primary" fullWidth disabled={!currentHasAnswer} onClick={() => goNextQuestion(isLast)}>{isLast ? '提交' : '下一题'}</DuoButton>
                   </div>
