@@ -902,7 +902,7 @@
                       </g>
                     </svg>
                   </div>
-                  <h1 className="text-2xl font-black text-[#4b4b4b] mt-4">洋葱学园 UED<br/>AI 技能考核 <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded">v7.0</span></h1>
+                  <h1 className="text-2xl font-black text-[#4b4b4b] mt-4">洋葱学园 UED<br/>AI 技能考核 <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded">v7.6</span></h1>
                 </div>
                 <div className="w-full space-y-4"> 
                   <input 
@@ -1192,12 +1192,40 @@
             const { score, maxScore, dimensionScores, dimensionMaxScores } = calculateScore();
             const durationMs = quizStartTime && (quizEndTime || Date.now()) ? (quizEndTime || Date.now()) - quizStartTime : null;
             
-            // Sort dimensions by numeric value if present in string (e.g. "Dimension 1")
-            const sortedDimensions = Object.keys(dimensionScores).sort((a, b) => {
-                const numA = parseInt(a.match(/\d+/)?.[0] || '999');
-                const numB = parseInt(b.match(/\d+/)?.[0] || '999');
-                return numA - numB;
+            // Map Chinese numerals to numbers
+            const chineseNumMap = {
+                '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+                '六': 6, '七': 7, '八': 8, '九': 9
+            };
+            
+            // Extract dimension number from Chinese numeral
+            const getDimensionNumber = (dimName) => {
+                const match = dimName.match(/维度([一二三四五六七八九])/);
+                if (match && match[1]) {
+                    return chineseNumMap[match[1]] || 999;
+                }
+                // Fallback: try to extract Arabic number
+                const numMatch = dimName.match(/\d+/);
+                return numMatch ? parseInt(numMatch[0]) : 999;
+            };
+            
+            // Remove duplicates and sort by dimension number (1-9)
+            const uniqueDimensions = {};
+            Object.keys(dimensionScores).forEach(dim => {
+                const dimNum = getDimensionNumber(dim);
+                // Only keep the first occurrence of each dimension number
+                if (!uniqueDimensions[dimNum] || dimNum === 999) {
+                    uniqueDimensions[dimNum] = dim;
+                }
             });
+            
+            // Create ordered list of dimensions 1-9
+            const sortedDimensions = [];
+            for (let i = 1; i <= 9; i++) {
+                if (uniqueDimensions[i]) {
+                    sortedDimensions.push(uniqueDimensions[i]);
+                }
+            }
 
             return (
               <div className="flex flex-col h-screen w-full bg-white">
