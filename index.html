@@ -392,6 +392,7 @@
           const [page, setPage] = useState('login'); 
           const [user, setUser] = useState({ name: '', role: '', isAdmin: false });
           const [dbQuestions, setDbQuestions] = useState([]); 
+          const [quizQuestions, setQuizQuestions] = useState([]); // 出题顺序：严格等于题库文件顺序（全员一致）
           const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
           const [answers, setAnswers] = useState({});
           const [rawTextSingle, setRawTextSingle] = useState('');
@@ -451,6 +452,8 @@
               if (roleQuestions.length === 0) {
                 return showToast(`题库中没有【${role === 'ui' ? 'UI 组' : '视觉组'}】的题目，请联系管理员`, "error");
               }
+              // 关键：不在答题时做任何随机。顺序完全由题库文件（管理员导出时混排一次）决定。
+              setQuizQuestions(roleQuestions);
               setPage('quiz');
               setCurrentQuestionIndex(0);
               setAnswers({});
@@ -563,22 +566,7 @@
               }
           }
 
-          const quizQuestions = useMemo(() => {
-            const filtered = dbQuestions.filter(q => q.role === user.role);
-            const grouped = {};
-            filtered.forEach(q => {
-              const dim = q.dimension || '通用维度';
-              const type = q.type || 'multiple';
-              const key = `${dim}_${type}`;
-              if (!grouped[key]) grouped[key] = [];
-              grouped[key].push(q);
-            });
-            Object.keys(grouped).forEach(key => {
-              grouped[key] = grouped[key].sort(() => Math.random() - 0.5);
-            });
-            const shuffledGroups = Object.keys(grouped).sort(() => Math.random() - 0.5);
-            return shuffledGroups.flatMap(key => grouped[key]);
-          }, [dbQuestions, user.role]);
+          // quizQuestions 已在开始答题时固定，不在渲染期反复随机
           
           const handleOptionClick = (qId, optId) => {
             const question = quizQuestions.find(q => q.id === qId);
@@ -1234,6 +1222,22 @@
             const currentInDim = dimensionQuestions.findIndex(i => i.id === q.id) + 1;
             const currentHasAnswer = answers[q.id] && answers[q.id].length > 0;
             const isLiked = likedQuestions.has(currentQuestionIndex + 1);
+            // Defensive: filter empty options and dedupe by id to avoid blank/duplicate options
+            const displayOptions = (() => {
+              const raw = Array.isArray(q.options) ? q.options : [];
+              const cleaned = raw
+                .filter(opt => opt && typeof opt.id === 'string' && opt.id.trim())
+                .map(opt => ({ id: String(opt.id).trim(), text: typeof opt.text === 'string' ? opt.text : String(opt.text ?? '') }))
+                .filter(opt => opt.text.trim() !== '');
+              const seen = new Set();
+              const deduped = [];
+              for (const opt of cleaned) {
+                if (seen.has(opt.id)) continue;
+                seen.add(opt.id);
+                deduped.push(opt);
+              }
+              return deduped;
+            })();
 
             return (
               <div className="flex flex-col h-screen w-full bg-white">
@@ -1259,7 +1263,14 @@
                     </div>
                     <h2 className="text-xl font-bold text-[#4b4b4b] mb-6">{q.question}</h2>
                     <div className="space-y-3 pb-8">
-                      {q.options.map(opt => <OptionCard key={opt.id} option={opt} selected={answers[q.id]?.includes(opt.id)} onClick={() => handleOptionClick(q.id, opt.id)} />)}
+                      {displayOptions.map((opt, idx) => (
+                        <OptionCard
+                          key={`${q.id}-${opt.id}-${idx}`}
+                          option={opt}
+                          selected={answers[q.id]?.includes(opt.id)}
+                          onClick={() => handleOptionClick(q.id, opt.id)}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
