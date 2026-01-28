@@ -1,4 +1,30 @@
-window.DEFAULT_QUESTIONS_VISUAL = [
+// NOTE: 为了“单选/多选题混排 + AI 维度顺序混排”，这里在加载时做一次可复现洗牌。
+// 如需改洗牌结果，只要改 SEED 常量即可。
+window.DEFAULT_QUESTIONS_VISUAL = (() => {
+  const SEED = 0x5649_0001; // stable seed for Visual question bank
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function next() {
+      a |= 0;
+      a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function seededShuffle(items, seed) {
+    const rand = mulberry32(seed);
+    const arr = items.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  const QUESTIONS = [
   {
     "role": "visual",
     "dimension": "维度三：影响他人对AI的重视程度",
@@ -6,7 +32,7 @@ window.DEFAULT_QUESTIONS_VISUAL = [
     "options": [
       {
         "id": "A",
-        "text": "在周会上展示 即梦 (Jimeng)的底层扩散模型数学公式，详细讲解 Latent Space (潜空间) 的降噪原理，从理论物理的高度证明 AI 生成的随机性是可以被数学收敛的，以此说服品牌总监。"
+        "text": "在周会上展示即梦 (Jimeng)的底层扩散模型数学公式，详细讲解 Latent Space (潜空间) 的降噪原理，从理论物理的高度证明 AI 生成的随机性是可以被数学收敛的，以此说服品牌总监。"
       },
       {
         "id": "B",
@@ -14,7 +40,7 @@ window.DEFAULT_QUESTIONS_VISUAL = [
       },
       {
         "id": "C",
-        "text": "上传 品牌部门VI 手册到即梦 (Jimeng)，AI 就能在生成过程中实时进行“合规审查”，修正细节。"
+        "text": "上传 品牌部门VI手册到即梦 (Jimeng)，AI 就能在生成过程中实时进行“合规审查”，修正细节。"
       },
       {
         "id": "D",
@@ -1078,4 +1104,7 @@ window.DEFAULT_QUESTIONS_VISUAL = [
     "type": "multiple",
     "id": "visual-multiple-1769587483379-92199-12"
   }
-];
+  ];
+
+  return seededShuffle(QUESTIONS, SEED);
+})();
