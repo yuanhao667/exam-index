@@ -4,5 +4,25 @@
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }
+  ],
+  "headers": [
+    {
+      "source": "/DEFAULT_QUESTIONS_ui.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/DEFAULT_QUESTIONS_visual.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
   ]
 }

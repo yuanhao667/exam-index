@@ -12,8 +12,9 @@
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- 外部题目文件（如果文件不存在会自动忽略，使用默认题目） -->
-    <script src="./DEFAULT_QUESTIONS_ui.js" onerror="console.error('DEFAULT_QUESTIONS_ui.js 加载失败:', arguments[0])"></script>
-    <script src="./DEFAULT_QUESTIONS_visual.js" onerror="console.error('DEFAULT_QUESTIONS_visual.js 加载失败:', arguments[0])"></script>
+    <!-- 添加版本号防止缓存：每次更新文件内容时，请修改 v= 后面的版本号 -->
+    <script src="./DEFAULT_QUESTIONS_ui.js?v=2" onerror="console.error('DEFAULT_QUESTIONS_ui.js 加载失败:', arguments[0])"></script>
+    <script src="./DEFAULT_QUESTIONS_visual.js?v=2" onerror="console.error('DEFAULT_QUESTIONS_visual.js 加载失败:', arguments[0])"></script>
     <script>
       // 兼容旧格式：如果外部文件使用 const DEFAULT_QUESTIONS，自动转换
       // 初始化变量
