@@ -600,8 +600,8 @@
             if (page === 'result' && quizStartTime && quizEndTime && !hasAutoSaved) {
               setHasAutoSaved(true);
               const autoSave = async () => {
-                const { score } = calculateScore();
-                await saveToFeishu(score);
+                const { score, maxScore } = calculateScore();
+                await saveToFeishu(score, maxScore);
               };
               autoSave();
             }
@@ -766,7 +766,7 @@
           };
 
           // 保存数据到飞书多维表格（直接从浏览器调用，绕过 Vercel）
-          const saveToFeishu = async (score) => {
+          const saveToFeishu = async (score, maxScore) => {
             try {
               showToast('正在保存数据到飞书...', 'info');
               
@@ -802,6 +802,7 @@
               const durationMinutes = durationMs ? Math.floor(durationMs / 60000) : 0;
               const durationSeconds = durationMs ? Math.floor((durationMs % 60000) / 1000) : 0;
               const durationText = `${durationMinutes}分${durationSeconds}秒`;
+              const passLine = Math.round((maxScore || 0) * 0.6); // 及格线：默认 60%
 
               // 4. 构建记录数据（根据飞书表格的实际字段名称）
               // 注意：字段名称必须与飞书表格中的列名完全一致
@@ -814,12 +815,22 @@
               
               const recordData = {
                 fields: {
-                  '姓名': user.name,
-                  '组别': user.role === 'ui' ? 'UI' : '视觉',
-                  '得分': score,  // 表格中是 "得分"，不是 "# 得分"
-                  '耗时': durationText,  // 表格中是 "耗时"，不是 "A≡ 耗时" 或 "A= 耗时"
-                  '作答日期': Date.now(),  // 毫秒时间戳（飞书推荐格式）
-                  '点赞题号': likedQuestionText  // 点赞题号，格式如 "1，6，7，15"
+                  // 姓名
+                  'fldlEdRMR9': user.name,
+                  // 组别（UI / 视觉）
+                  'fldZSSpdGM': user.role === 'ui' ? 'UI' : '视觉',
+                  // 得分
+                  'fldNgRve23': score,
+                  // 耗时（文本，如 "5分30秒"）
+                  'fldc9GB9Pu': durationText,
+                  // 作答日期（毫秒时间戳）
+                  'fldbTOzuCq': Date.now(),
+                  // 点赞题号（"1，6，7，15"）
+                  'fldStKSbfp': likedQuestionText,
+                  // 及格线（默认 60% * 试卷总分）
+                  'fldtVZlFMQ': passLine,
+                  // 试卷总分
+                  'fldRcZ7Cbk': maxScore
                 }
               };
 
