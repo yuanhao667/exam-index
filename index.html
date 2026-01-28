@@ -736,33 +736,10 @@
             }
           };
 
-          // 获取表格列表（通过代理）
+          // 获取表格 ID（使用固定值）
           const getFeishuTables = async (accessToken) => {
-            try {
-              const response = await fetch(getProxyUrl(), {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  action: 'getTables',
-                  accessToken: accessToken
-                })
-              });
-              
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              
-              const data = await response.json();
-              if (data.code === 0 && data.data && data.data.items && data.data.items.length > 0) {
-                return data.data.items[0].table_id; // 返回第一个表格的 table_id
-              } else {
-                throw new Error(data.msg || `获取表格列表失败: code=${data.code}`);
-              }
-            } catch (error) {
-              throw error;
-            }
+            // 直接返回固定的表格 ID，避免动态获取导致的问题
+            return 'tbl4BqBwE4MeNIL4';
           };
 
           // 保存数据到飞书多维表格（直接从浏览器调用，绕过 Vercel）
