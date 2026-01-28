@@ -16,7 +16,8 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { action, ...params } = req.body;
+  const body = req.body;
+  const { action, ...params } = body;
 
   try {
     // 从 Vercel 环境变量读取飞书配置
@@ -27,8 +28,11 @@ module.exports = async (req, res) => {
     const FEISHU_CONFIG = {
       appId: process.env.FEISHU_APP_ID,
       appSecret: process.env.FEISHU_APP_SECRET,
-      appToken: process.env.FEISHU_APP_TOKEN
+      appToken: process.env.FEISHU_APP_TOKEN || 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb' // 默认值
     };
+
+    // 固定的表格 ID
+    const TABLE_ID = 'tbl4BqBwE4MeNIL4';
 
     // 验证必需的配置项
     if (!FEISHU_CONFIG.appId || !FEISHU_CONFIG.appSecret || !FEISHU_CONFIG.appToken) {
@@ -49,8 +53,8 @@ module.exports = async (req, res) => {
       });
     }
 
-    if (action === 'getToken') {
-      // 获取access_token
+    // 辅助函数：获取 access_token
+    const getAccessToken = async () => {
       const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
         method: 'POST',
         headers: {
@@ -61,9 +65,51 @@ module.exports = async (req, res) => {
           app_secret: FEISHU_CONFIG.appSecret
         })
       });
+      const data = await response.json();
+      if (data.code !== 0) {
+        throw new Error(data.msg || '获取 access_token 失败');
+      }
+      return data.tenant_access_token;
+    };
+
+    // 如果请求体直接包含 fields，当作直接保存请求处理
+    if (body.fields && typeof body.fields === 'object') {
+      console.log('💾 直接保存记录 - 字段名:', Object.keys(body.fields));
+      console.log('💾 直接保存记录 - 完整数据:', JSON.stringify(body, null, 2));
+      
+      // 获取 access_token
+      const accessToken = await getAccessToken();
+      
+      // 构建 recordData
+      const recordData = {
+        fields: body.fields
+      };
+      
+      // 调用飞书 API 保存
+      const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${TABLE_ID}/records`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(recordData)
+      });
 
       const data = await response.json();
+      console.log('📦 飞书API响应状态:', response.status);
+      console.log('📦 飞书API响应数据:', JSON.stringify(data, null, 2));
+      
+      if (data.code !== 0) {
+        console.error('❌ 飞书API错误:', data.msg || data.error || '未知错误');
+      }
+      
       return res.status(200).json(data);
+    }
+
+    // 兼容旧的 action 模式（保留以支持其他可能的调用）
+    if (action === 'getToken') {
+      const accessToken = await getAccessToken();
+      return res.status(200).json({ code: 0, tenant_access_token: accessToken });
     }
 
     if (action === 'getTables') {
@@ -104,16 +150,19 @@ module.exports = async (req, res) => {
     }
 
     if (action === 'saveRecord') {
-      // 保存记录
+      // 兼容旧的 saveRecord action 模式
       const { accessToken, tableId, recordData } = params;
-      console.log('💾 保存记录 - 表格ID:', tableId);
+      const targetTableId = tableId || TABLE_ID;
+      const targetAccessToken = accessToken || await getAccessToken();
+      
+      console.log('💾 保存记录 (action模式) - 表格ID:', targetTableId);
       console.log('💾 保存记录 - 字段名:', Object.keys(recordData.fields || {}));
       console.log('💾 保存记录 - 完整数据:', JSON.stringify(recordData, null, 2));
       
-      const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${tableId}/records`, {
+      const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${targetTableId}/records`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${targetAccessToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(recordData)
@@ -133,7 +182,8 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    return res.status(400).json({ error: 'Invalid action' });
+    // 如果没有匹配的 action，且也没有 fields，返回错误
+    return res.status(400).json({ error: 'Invalid request. Expected { fields: {...} } or valid action.' });
   } catch (error) {
     console.error('Feishu API proxy error:', error);
     return res.status(500).json({ error: error.message || 'Internal server error' });
