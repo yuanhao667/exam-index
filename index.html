@@ -719,6 +719,10 @@
               // 点赞题号：将点赞的题号数组转换为字符串，如 "1，6，7，15"
               const likedQuestionNumbers = Array.from(likedQuestions).sort((a, b) => a - b);
               const likedQuestionText = likedQuestionNumbers.length > 0 ? likedQuestionNumbers.join('，') : '';
+
+              // 作答日期：仅年/月/日，格式 YYYY/MM/DD
+              const now = new Date();
+              const answerDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
               
               // 构建记录数据（直接使用 Field ID 作为 Key）
               const payload = {
@@ -731,8 +735,8 @@
                   'fldNgRve23': score,
                   // 耗时（文本，如 "5分30秒"）
                   'fldc9GB9Pu': durationText,
-                  // 作答日期（毫秒时间戳）
-                  'fldbTOzuCq': Date.now(),
+                  // 作答日期（YYYY/MM/DD，不含时分秒）
+                  'fldbTOzuCq': answerDateStr,
                   // 点赞题号（"1，6，7，15"）
                   'fldStKSbfp': likedQuestionText
                 }
