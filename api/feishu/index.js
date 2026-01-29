@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // 辅助函数：获取 access_token
+    // 辅助函数：获取 access_token（鉴权失败时返回 null，不 throw，便于区分 401 与 500）
     const getAccessToken = async () => {
       const response = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
         method: 'POST',
@@ -79,7 +79,12 @@ module.exports = async (req, res) => {
       });
       const data = await response.json();
       if (data.code !== 0) {
-        throw new Error(data.msg || '获取 access_token 失败');
+        const msg = data.msg || '获取 access_token 失败';
+        console.error('❌ 飞书鉴权失败:', msg, data);
+        const err = new Error(msg);
+        err.code = data.code;
+        err.feishuResponse = data;
+        throw err;
       }
       return data.tenant_access_token;
     };
@@ -87,17 +92,34 @@ module.exports = async (req, res) => {
     // 如果请求体直接包含 fields，当作直接保存请求处理
     if (body.fields && typeof body.fields === 'object') {
       console.log('💾 直接保存记录 - 字段名:', Object.keys(body.fields));
-      console.log('💾 直接保存记录 - 完整数据:', JSON.stringify(body, null, 2));
-      
-      // 获取 access_token
-      const accessToken = await getAccessToken();
-      
-      // 构建 recordData
-      const recordData = {
-        fields: body.fields
-      };
-      
-      // 调用飞书 API 保存
+      // 清洗 fields：飞书不接受 undefined/null，统一转为空字符串；数字保持 number
+      const sanitizedFields = {};
+      for (const [k, v] of Object.entries(body.fields)) {
+        if (v === undefined || v === null) {
+          sanitizedFields[k] = '';
+        } else if (typeof v === 'number' && !Number.isFinite(v)) {
+          sanitizedFields[k] = 0;
+        } else {
+          sanitizedFields[k] = v;
+        }
+      }
+      console.log('💾 直接保存记录 - 清洗后数据:', JSON.stringify({ fields: sanitizedFields }, null, 2));
+
+      let accessToken;
+      try {
+        accessToken = await getAccessToken();
+      } catch (authErr) {
+        const msg = authErr.message || 'invalid param';
+        const code = authErr.code;
+        return res.status(401).json({
+          error: msg,
+          code: code != null ? code : 'AUTH_FAILED',
+          hint: '请检查 Vercel 环境变量 FEISHU_APP_ID、FEISHU_APP_SECRET 是否正确'
+        });
+      }
+
+      const recordData = { fields: sanitizedFields };
+
       const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${TABLE_ID}/records`, {
         method: 'POST',
         headers: {
@@ -110,11 +132,16 @@ module.exports = async (req, res) => {
       const data = await response.json();
       console.log('📦 飞书API响应状态:', response.status);
       console.log('📦 飞书API响应数据:', JSON.stringify(data, null, 2));
-      
+
       if (data.code !== 0) {
         console.error('❌ 飞书API错误:', data.msg || data.error || '未知错误');
+        return res.status(400).json({
+          error: data.msg || data.error || 'invalid param',
+          code: data.code,
+          feishu: data
+        });
       }
-      
+
       return res.status(200).json(data);
     }
 
