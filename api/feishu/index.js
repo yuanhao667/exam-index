@@ -46,6 +46,16 @@ module.exports = async (req, res) => {
     // 固定的表格 ID
     const TABLE_ID = 'tbl4BqBwE4MeNIL4';
 
+    // 字段 ID 映射：可通过环境变量覆盖，表格结构变化时只需改环境变量
+    const FIELD_IDS = {
+      userName: process.env.FEISHU_FIELD_USER_NAME || 'fldlEdRMR9',
+      role: process.env.FEISHU_FIELD_ROLE || 'fldZSSpdGM',
+      score: process.env.FEISHU_FIELD_SCORE || 'fldNgRve23',
+      duration: process.env.FEISHU_FIELD_DURATION || 'fldc9GB9Pu',
+      answerDate: process.env.FEISHU_FIELD_ANSWER_DATE || 'fldbTOzuCq',
+      likedQuestions: process.env.FEISHU_FIELD_LIKED_QUESTIONS || 'fldStKSbfp'
+    };
+
     // 验证必需的配置项
     if (!FEISHU_CONFIG.appId || !FEISHU_CONFIG.appSecret || !FEISHU_CONFIG.appToken) {
       console.error('❌ 飞书配置缺失 - 请检查 Vercel 环境变量设置:', {
@@ -91,18 +101,20 @@ module.exports = async (req, res) => {
 
     // 如果请求体直接包含 fields，当作直接保存请求处理
     if (body.fields && typeof body.fields === 'object') {
-      console.log('💾 直接保存记录 - 字段名:', Object.keys(body.fields));
-      // 清洗 fields：飞书不接受 undefined/null，统一转为空字符串；数字保持 number
+      console.log('💾 直接保存记录 - 入参字段:', Object.keys(body.fields));
+      // 支持逻辑字段名（userName/role/score 等）映射为飞书 field_name；若 key 已是 fld 开头则原样使用
       const sanitizedFields = {};
-      for (const [k, v] of Object.entries(body.fields)) {
+      for (const [key, v] of Object.entries(body.fields)) {
+        const feishuFieldId = FIELD_IDS[key] || key;
         if (v === undefined || v === null) {
-          sanitizedFields[k] = '';
+          sanitizedFields[feishuFieldId] = '';
         } else if (typeof v === 'number' && !Number.isFinite(v)) {
-          sanitizedFields[k] = 0;
+          sanitizedFields[feishuFieldId] = 0;
         } else {
-          sanitizedFields[k] = v;
+          sanitizedFields[feishuFieldId] = v;
         }
       }
+      console.log('💾 直接保存记录 - 飞书字段 ID:', Object.keys(sanitizedFields));
       console.log('💾 直接保存记录 - 清洗后数据:', JSON.stringify({ fields: sanitizedFields }, null, 2));
 
       let accessToken;

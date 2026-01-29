@@ -78,3 +78,28 @@
 
 - 当前“飞书接口错误”的主要原因更可能是：**本地 API 地址/端口不一致** 或 **未在本地起带 `/api/feishu` 的服务**，而不是前端没有使用 api/feishu 的协议（前端已按 `{ fields }` 直接保存模式调用）。
 - 通过**统一使用当前 origin 的 `/api/feishu`**、**完善错误解析与提示**、以及 **api/feishu 内对 body 做安全解析**，可以更好对齐 api/feishu 的逻辑并提升可排查性。
+
+---
+
+## 五、FieldNameNotFound (1254045) 排查
+
+当飞书返回 `FieldNameNotFound`、提示某 `field_name` 不存在时，说明多维表格的列 ID 与代码中使用的默认值不一致（例如表格重建、列重命名或复制了新的多维表格）。
+
+**处理方式：**
+
+1. **获取当前表格的字段 ID**  
+   后端支持通过 `action: 'getFields'` 查询表格字段列表：  
+   - 先 POST `/api/feishu`，body: `{ "action": "getToken" }`，从响应中取 `tenant_access_token`。  
+   - 再 POST `/api/feishu`，body: `{ "action": "getFields", "accessToken": "<上一步的 token>", "tableId": "tbl4BqBwE4MeNIL4" }`。  
+   - 响应 `data.items` 中每个字段有 `field_name`（即飞书 field ID）和 `name`（列名），按列名对应到：姓名 → USER_NAME、组别 → ROLE、得分 → SCORE、用时 → DURATION、答题日期 → ANSWER_DATE、点赞题号 → LIKED_QUESTIONS。
+
+2. **在 Vercel 环境变量中覆盖字段 ID**  
+   在项目设置中增加或修改（将 `fldxxx` 替换为你在上一步查到的 field_name）：  
+   - `FEISHU_FIELD_USER_NAME`  
+   - `FEISHU_FIELD_ROLE`  
+   - `FEISHU_FIELD_SCORE`  
+   - `FEISHU_FIELD_DURATION`  
+   - `FEISHU_FIELD_ANSWER_DATE`（报错中若为 `fldbTOzuCq`，多半是「答题日期」列 ID 已变，重点改此项）  
+   - `FEISHU_FIELD_LIKED_QUESTIONS`  
+
+   保存后重新部署或等待环境变量生效，再重试提交。

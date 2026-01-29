@@ -721,15 +721,15 @@
               const now = new Date();
               const answerDateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
 
-              // 与 api/feishu/index.js 约定：POST body 为 { fields: {...} }，接口内 getAccessToken + TABLE_ID 写飞书
+              // 与 api/feishu/index.js 约定：POST body 为 { fields: {...} }，使用逻辑字段名，后端按 FEISHU_FIELD_* 映射为飞书 field_name
               const body = {
                 fields: {
-                  'fldlEdRMR9': user.name,
-                  'fldZSSpdGM': user.role === 'ui' ? 'UI' : '视觉',
-                  'fldNgRve23': score,
-                  'fldc9GB9Pu': durationText,
-                  'fldbTOzuCq': answerDateStr,
-                  'fldStKSbfp': likedQuestionText
+                  userName: user.name,
+                  role: user.role === 'ui' ? 'UI' : '视觉',
+                  score: score,
+                  duration: durationText,
+                  answerDate: answerDateStr,
+                  likedQuestions: likedQuestionText
                 }
               };
 
