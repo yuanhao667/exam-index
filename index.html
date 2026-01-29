@@ -715,7 +715,6 @@
               const durationMinutes = durationMs ? Math.floor(durationMs / 60000) : 0;
               const durationSeconds = durationMs ? Math.floor((durationMs % 60000) / 1000) : 0;
               const durationText = `${durationMinutes}分${durationSeconds}秒`;
-              const passLine = Math.round((maxScore || 0) * 0.6); // 及格线：默认 60%
 
               // 点赞题号：将点赞的题号数组转换为字符串，如 "1，6，7，15"
               const likedQuestionNumbers = Array.from(likedQuestions).sort((a, b) => a - b);
@@ -735,11 +734,7 @@
                   // 作答日期（毫秒时间戳）
                   'fldbTOzuCq': Date.now(),
                   // 点赞题号（"1，6，7，15"）
-                  'fldStKSbfp': likedQuestionText,
-                  // 及格线（默认 60% * 试卷总分）
-                  'fldtVZlFMQ': passLine,
-                  // 试卷总分
-                  'fldRcZ7Cbk': maxScore
+                  'fldStKSbfp': likedQuestionText
                 }
               };
 
