@@ -690,23 +690,23 @@
             return { score, maxScore: totalMaxScore, dimensionScores: displayDimensionScores, dimensionMaxScores: displayDimensionMaxScores };
           };
 
-          // 飞书 API 配置（通过本地代理服务器或 Vercel Functions）
-          const FEISHU_CONFIG = {
-            appToken: 'EDjSb0Tl2ap5aTsbuXgcPpS9nTb'
-          };
-
-          // 获取API地址（自动检测环境）
+          // 飞书 API：统一走 api/feishu 的逻辑（Vercel Serverless 或 vercel dev）
+          // 不写死端口，使用当前页面同源，确保与 api/feishu/index.js 的「直接保存 fields」协议一致
           const getFeishuApiUrl = () => {
-            // 检测是否在本地开发环境（localhost）
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-              return 'http://localhost:3000/api/feishu';
+            if (window.location.protocol === 'file:') {
+              return null; // file:// 下相对路径无效，需通过本地服务器访问
             }
-            // 生产环境使用相对路径（Vercel Functions）
-            return '/api/feishu';
+            // 本地或生产均使用同源 /api/feishu（本地请用 vercel dev 或同端口的静态服务）
+            return `${window.location.origin}/api/feishu`;
           };
 
-          // 保存数据到飞书多维表格（直接发送 fields 数据）
+          // 保存数据到飞书多维表格（直接发送 fields，由 api/feishu 代理调飞书 API）
           const saveToFeishu = async (score, maxScore) => {
+            const apiUrl = getFeishuApiUrl();
+            if (!apiUrl) {
+              showToast('请通过本地服务器访问页面（如 vercel dev 或 npx serve），以便使用飞书保存功能', 'error');
+              return false;
+            }
             try {
               showToast('正在保存数据到飞书...', 'info');
               
@@ -742,8 +742,8 @@
                 }
               };
 
-              // 直接向 /api/feishu 发送 POST 请求，Payload 就是 { fields: {...} }
-              const response = await fetch(getFeishuApiUrl(), {
+              // 与 api/feishu 约定：POST { fields }，接口内部取 token 并调飞书 API
+              const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'
@@ -751,12 +751,11 @@
                 body: JSON.stringify(payload)
               });
 
+              const result = await response.json().catch(() => ({}));
               if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+                const msg = result.error || result.msg || (Object.keys(result || {}).length ? JSON.stringify(result) : null);
+                throw new Error(msg || `HTTP ${response.status}`);
               }
-
-              const result = await response.json();
               
               if (result.code === 0 || result.success) {
                 showToast(`数据已成功保存到飞书！得分：${score}`, 'success');
