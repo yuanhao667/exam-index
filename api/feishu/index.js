@@ -200,6 +200,33 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
+    // 一键获取当前表字段 ID 及建议的环境变量映射（无需传 token，用于排查 FieldNameNotFound）
+    if (action === 'getFieldIds') {
+      const targetTableId = params.tableId || TABLE_ID;
+      const nameToEnv = { '姓名': 'FEISHU_FIELD_USER_NAME', '组别': 'FEISHU_FIELD_ROLE', '得分': 'FEISHU_FIELD_SCORE', '用时': 'FEISHU_FIELD_DURATION', '答题日期': 'FEISHU_FIELD_ANSWER_DATE', '点赞题号': 'FEISHU_FIELD_LIKED_QUESTIONS' };
+      let accessToken;
+      try {
+        accessToken = await getAccessToken();
+      } catch (e) {
+        return res.status(401).json({ error: e.message || 'getToken failed', code: 'AUTH_FAILED' });
+      }
+      const response = await fetch(`https://open.feishu.cn/open-apis/bitable/v1/apps/${FEISHU_CONFIG.appToken}/tables/${targetTableId}/fields`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (data.code !== 0) {
+        return res.status(400).json(data);
+      }
+      const items = (data.data && data.data.items) || [];
+      const mapping = items.map(f => {
+        const name = (f.name || f.field_name || '').trim();
+        const envKey = nameToEnv[name] || null;
+        return { field_name: f.field_name, name, envKey, setEnv: envKey ? `${envKey}=${f.field_name}` : null };
+      });
+      return res.status(200).json({ code: 0, tableId: targetTableId, fields: mapping, envLines: mapping.filter(x => x.setEnv).map(x => x.setEnv) });
+    }
+
     if (action === 'saveRecord') {
       // 兼容旧的 saveRecord action 模式
       const { accessToken, tableId, recordData } = params;
