@@ -48,12 +48,12 @@ module.exports = async (req, res) => {
 
     // 字段 ID 映射：可通过环境变量覆盖，表格结构变化时只需改环境变量
     const FIELD_IDS = {
-      userName: process.env.FEISHU_FIELD_USER_NAME || 'fldlEdRMR9',
-      role: process.env.FEISHU_FIELD_ROLE || 'fldZSSpdGM',
-      score: process.env.FEISHU_FIELD_SCORE || 'fldNgRve23',
-      duration: process.env.FEISHU_FIELD_DURATION || 'fldc9GB9Pu',
-      answerDate: process.env.FEISHU_FIELD_ANSWER_DATE || 'fldbTOzuCq',
-      likedQuestions: process.env.FEISHU_FIELD_LIKED_QUESTIONS || 'fldStKSbfp'
+      userName: process.env.FEISHU_FIELD_USER_NAME || '姓名',
+      role: process.env.FEISHU_FIELD_ROLE || '组别',
+      score: process.env.FEISHU_FIELD_SCORE || '得分',
+      duration: process.env.FEISHU_FIELD_DURATION || '耗时',
+      answerDate: process.env.FEISHU_FIELD_ANSWER_DATE || '作答日期',
+      likedQuestions: process.env.FEISHU_FIELD_LIKED_QUESTIONS || '点赞题号'
     };
 
     // 验证必需的配置项
